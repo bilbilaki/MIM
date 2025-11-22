@@ -6,7 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:provider/provider.dart';
 
-import '../../services/gridviw/useDataService.dart';
+import '../../services/useDataService.dart';
 
 
 class VideoPlayerScreen extends StatefulWidget {

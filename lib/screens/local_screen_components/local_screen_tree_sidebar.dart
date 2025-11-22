@@ -3,6 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../../widgets/icons/folder_icon_helper.dart';
 
+/// Model for system directory shortcuts
+class SystemDirectory {
+  final String name;
+  final String path;
+  final FolderType type;
+
+  SystemDirectory({
+    required this.name,
+    required this.path,
+    required this.type,
+  });
+}
+
 /// A tree view sidebar showing directory structure
 class TreeSidebar extends StatefulWidget {
   final String rootPath;
@@ -26,6 +39,7 @@ class _TreeSidebarState extends State<TreeSidebar> {
   final Map<String, bool> _expandedDirs = {};
   final Map<String, List<Directory>> _cachedSubdirs = {};
   final ScrollController _scrollController = ScrollController();
+  List<SystemDirectory> _systemDirs = [];
 
   @override
   void initState() {
@@ -33,6 +47,48 @@ class _TreeSidebarState extends State<TreeSidebar> {
     // Auto-expand root
     _expandedDirs[widget.rootPath] = true;
     _loadSubdirectories(widget.rootPath);
+    _loadSystemDirectories();
+  }
+
+  Future<void> _loadSystemDirectories() async {
+    final List<SystemDirectory> dirs = [];
+    
+    try {
+      // Get user home directory
+      String? homePath;
+      if (Platform.isLinux || Platform.isMacOS) {
+        homePath = Platform.environment['HOME'];
+      } else if (Platform.isWindows) {
+        homePath = Platform.environment['USERPROFILE'];
+      }
+
+      if (homePath != null && await Directory(homePath).exists()) {
+        // Add common system directories
+        final commonDirs = [
+          ('Desktop', FolderType.desktop),
+          ('Documents', FolderType.documents),
+          ('Downloads', FolderType.downloads),
+          ('Music', FolderType.music),
+          ('Pictures', FolderType.images),
+          ('Videos', FolderType.videos),
+        ];
+
+        for (final (name, type) in commonDirs) {
+          final path = p.join(homePath, name);
+          if (await Directory(path).exists()) {
+            dirs.add(SystemDirectory(name: name, path: path, type: type));
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _systemDirs = dirs;
+        });
+      }
+    } catch (e) {
+      // Silently fail if unable to load system directories
+    }
   }
 
   @override
@@ -83,8 +139,42 @@ class _TreeSidebarState extends State<TreeSidebar> {
   }
 
   Widget _buildFolderIcon(String folderName) {
-    // Using the FolderIconHelper - replace with your SVG implementation later
+    // Using the FolderIconHelper with SVG support
     return FolderIconHelper.getIcon(folderName, size: 18);
+  }
+
+  Widget _buildSystemDirItem(SystemDirectory sysDir) {
+    final isSelected = widget.currentPath != null && 
+                       p.equals(sysDir.path, widget.currentPath!);
+
+    return InkWell(
+      onTap: () => widget.onPathSelected(sysDir.path),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+            : null,
+        child: Row(
+          children: [
+            FolderIconHelper.getIcon(sysDir.name, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                sysDir.name,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTreeNode(String dirPath, int depth) {
@@ -195,7 +285,7 @@ class _TreeSidebarState extends State<TreeSidebar> {
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'Folders',
+                  'Navigation',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -211,7 +301,42 @@ class _TreeSidebarState extends State<TreeSidebar> {
               thumbVisibility: true,
               child: SingleChildScrollView(
                 controller: _scrollController,
-                child: _buildTreeNode(widget.rootPath, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // System Directories Section
+                    if (_systemDirs.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                        child: Text(
+                          'Quick Access',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[600],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      ..._systemDirs.map((sysDir) => _buildSystemDirItem(sysDir)),
+                      const Divider(height: 16),
+                    ],
+                    // Current Root Directory
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      child: Text(
+                        'Current Location',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    _buildTreeNode(widget.rootPath, 0),
+                  ],
+                ),
               ),
             ),
           ),

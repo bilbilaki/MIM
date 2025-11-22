@@ -36,56 +36,75 @@ class FolderIconHelper {
   }
 
   /// Get icon widget based on folder type
-  /// TODO: Replace with SvgPicture.asset('assets/icons/folder_music.svg')
   static Widget _getIconWidget(FolderType type, double size) {
-    IconData iconData;
-    Color color;
+    String assetPath;
+    IconData fallbackIcon;
+    Color fallbackColor;
 
     switch (type) {
       case FolderType.music:
-        iconData = Icons.music_note;
-        color = Colors.purple;
-       return SvgPicture.asset('assets/icons/folder_music.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_music.svg';
+        fallbackIcon = Icons.music_note;
+        fallbackColor = Colors.purple;
         break;
       case FolderType.images:
-        iconData = Icons.image;
-        color = Colors.blue;
-       return SvgPicture.asset('assets/icons/folder_images.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_images.svg';
+        fallbackIcon = Icons.image;
+        fallbackColor = Colors.blue;
         break;
       case FolderType.videos:
-        iconData = Icons.video_library;
-        color = Colors.red;
-       return SvgPicture.asset('assets/icons/folder_videos.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_videos.svg';
+        fallbackIcon = Icons.video_library;
+        fallbackColor = Colors.red;
         break;
       case FolderType.documents:
-        iconData = Icons.description;
-        color = Colors.orange;
-       return SvgPicture.asset('assets/icons/folder_documents.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_documents.svg';
+        fallbackIcon = Icons.description;
+        fallbackColor = Colors.orange;
         break;
       case FolderType.downloads:
-        iconData = Icons.download;
-        color = Colors.green;
-        return SvgPicture.asset('assets/icons/folder_downloads.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_downloads.svg';
+        fallbackIcon = Icons.download;
+        fallbackColor = Colors.green;
         break;
       case FolderType.desktop:
-        iconData = Icons.computer;
-        color = Colors.teal;
-       return SvgPicture.asset('assets/icons/folder_desktop.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_desktop.svg';
+        fallbackIcon = Icons.computer;
+        fallbackColor = Colors.teal;
         break;
       case FolderType.work:
-        iconData = Icons.work;
-        color = Colors.indigo;
-        return SvgPicture.asset('assets/icons/folder_work.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_work.svg';
+        fallbackIcon = Icons.work;
+        fallbackColor = Colors.indigo;
         break;
       case FolderType.generic:
-        iconData = Icons.folder;
-        color = Colors.amber;
-        return SvgPicture.asset('assets/icons/folder_generic.svg', width: size, height: size);
+        assetPath = 'assets/icons/folder_generic.svg';
+        fallbackIcon = Icons.folder;
+        fallbackColor = Colors.amber;
         break;
     }
 
-    // Placeholder: Using Material Icons
-    return Icon(iconData, size: size, color: color);
+    // Try to load SVG with error handling
+    // Note: SVG files contain embedded PNG images which may not render properly
+    // Using errorBuilder to show Material Icons if SVG fails to load
+    return SvgPicture.asset(
+      assetPath,
+      width: size,
+      height: size,
+      placeholderBuilder: (context) => Icon(
+        fallbackIcon,
+        size: size,
+        color: fallbackColor,
+      ),
+      // Show fallback icon if SVG fails to load
+      // ignore: deprecated_member_use
+      errorBuilder: (context, error, stackTrace) => Icon(
+        fallbackIcon,
+        size: size,
+        color: fallbackColor,
+      ),
+      fit: BoxFit.contain,
+    );
   }
 
   /// Get color for folder type (useful for other UI elements)

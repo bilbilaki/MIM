@@ -1,0 +1,56 @@
+  Generating the build script.
+  Reading the asset graph.
+  Checking for updates.
+  Updating the asset graph.
+  Building, incremental build.
+  0s freezed on 147 inputs; lib/main.dart
+  0s freezed on 147 inputs: 1 skipped; lib/models/model_core/fs_entry.dart
+  0s freezed on 147 inputs: 147 skipped
+  0s json_serializable on 294 inputs; lib/main.dart
+  1s json_serializable on 294 inputs: 219 skipped; lib/models/model_files/tools/action/git_pull.freezed.dart
+  1s json_serializable on 294 inputs: 294 skipped; spent 1s tracking
+  0s source_gen:combining_builder on 294 inputs; lib/main.dart
+  0s source_gen:combining_builder on 294 inputs: 294 skipped
+  Running the post build.
+  Writing the asset graph.
+E freezed on lib/models/model_files/tasks/batch_file_opration_extract.dart:
+  Getters require a MyClass._() constructor
+  package:du/models/model_files/tasks/batch_file_opration_extract.dart:161:9
+      ╷
+  161 │ int get successCount => results.where((r) => r.success).length;
+      │         ^^^^^^^^^^^^
+      ╵
+E freezed on lib/models/model_files/tasks/duplicated_file.dart:
+  Getters require a MyClass._() constructor
+  package:du/models/model_files/tasks/duplicated_file.dart:258:9
+      ╷
+  258 │ int get potentialSavingsBytes {
+      │         ^^^^^^^^^^^^^^^^^^^^^
+      ╵
+E json_serializable on lib/models/model_files/tasks/batch_file_opration_remove.dart:
+  Could not generate `fromJson` code for `removedEntry`.
+  To support the type `InvalidType` you can:
+  * Use `JsonConverter`
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonConverter-class.html
+  * Use `JsonKey` fields `fromJson` and `toJson`
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonKey/fromJson.html
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonKey/toJson.html
+  package:du/models/model_files/tasks/batch_file_opration_remove.freezed.dart:717:18
+      ╷
+  717 │   final FsEntry? removedEntry;
+      │                  ^^^^^^^^^^^^
+      ╵
+E json_serializable on lib/models/model_files/tasks/batch_file_opration_rename.dart:
+  Could not generate `fromJson` code for `updatedEntry`.
+  To support the type `InvalidType` you can:
+  * Use `JsonConverter`
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonConverter-class.html
+  * Use `JsonKey` fields `fromJson` and `toJson`
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonKey/fromJson.html
+    https://pub.dev/documentation/json_annotation/latest/json_annotation/JsonKey/toJson.html
+  package:du/models/model_files/tasks/batch_file_opration_rename.freezed.dart:231:18
+      ╷
+  231 │   final FsEntry? updatedEntry;
+      │                  ^^^^^^^^^^^^
+      ╵
+  Failed to build with build_runner in 4s; wrote 0 outputs.

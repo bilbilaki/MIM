@@ -228,42 +228,45 @@ class LocalScreenState extends State<LocalScreen> {
             //     );
             //   },
             // ),
-            actions: LocalScreenAppBarActions.buildActions(
-              context: context,
-              viewMode: _viewMode,
-              sortMode: _sortMode,
-              sortAscending: _sortAscending,
-              onToggleView: () => setState(() => _viewMode = _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
-              onShowSizeSlider: () => LocalScreenDialogs.showSizeSliderDialog(context, _gridCrossAxisCount, (newValue) => setState(() => _gridCrossAxisCount = newValue)),
-              onSortSelected: (mode) {
-                if (_sortMode == mode) {
-                  setState(() => _sortAscending = !_sortAscending);
-                } else {
-                  setState(() {
-                    _sortMode = mode;
-                    _sortAscending = true;
-                  });
-                }
-              },
-              onChangeFolder: _promptPathSelection,
-              onRefresh: () => provider.refresh(currentFolderPath),
-              onBatchRename: () => LocalScreenFileOperations.showBatchRenameDialog(context, provider, currentFolderPath, showSnackBar),
-              onClearCache: () async {
-                final confirmed = await LocalScreenDialogs.showConfirmationDialog(
-                  context,
-                  'Clear Cache',
-                  'Are you sure you want to clear all generated thumbnail cache files?',
-                );
-                if (confirmed == true) {
-                  final success = await provider.clearAllThumbnailsCache();
-                  if (success) {
-                    showSnackBar('Thumbnail cache cleared successfully.');
+            actions: [
+              // Image Gallery Button
+              ...LocalScreenAppBarActions.buildActions(
+                context: context,
+                viewMode: _viewMode,
+                sortMode: _sortMode,
+                sortAscending: _sortAscending,
+                onToggleView: () => setState(() => _viewMode = _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
+                onShowSizeSlider: () => LocalScreenDialogs.showSizeSliderDialog(context, _gridCrossAxisCount, (newValue) => setState(() => _gridCrossAxisCount = newValue)),
+                onSortSelected: (mode) {
+                  if (_sortMode == mode) {
+                    setState(() => _sortAscending = !_sortAscending);
                   } else {
-                    showSnackBar('Failed to clear thumbnail cache.');
+                    setState(() {
+                      _sortMode = mode;
+                      _sortAscending = true;
+                    });
                   }
-                }
-              },
-            ),
+                },
+                onChangeFolder: _promptPathSelection,
+                onRefresh: () => provider.refresh(currentFolderPath),
+                onBatchRename: () => LocalScreenFileOperations.showBatchRenameDialog(context, provider, currentFolderPath, showSnackBar),
+                onClearCache: () async {
+                  final confirmed = await LocalScreenDialogs.showConfirmationDialog(
+                    context,
+                    'Clear Cache',
+                    'Are you sure you want to clear all generated thumbnail cache files?',
+                  );
+                  if (confirmed == true) {
+                    final success = await provider.clearAllThumbnailsCache();
+                    if (success) {
+                      showSnackBar('Thumbnail cache cleared successfully.');
+                    } else {
+                      showSnackBar('Failed to clear thumbnail cache.');
+                    }
+                  }
+                },
+              ),
+            ],
           ),
           drawer: const ComponentLibraryDrawer(), // Your left drawer
           endDrawer: const ComponentBrowserDrawer(), // Your right drawer
@@ -424,6 +427,11 @@ class LocalScreenState extends State<LocalScreen> {
       (d) => LocalScreenFileOperations.createNewFolder(context, d, provider, showSnackBar),
     );
   }
+
+ 
+
+  /// Load image files from a directory
+ 
 
   /// Displays a SnackBar message at the bottom of the screen.
   void showSnackBar(String message) {

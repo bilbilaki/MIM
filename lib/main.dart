@@ -1,6 +1,6 @@
 import 'package:du/providers/local_explorer_provider.dart';
 import 'package:du/screens/local_explorer.dart';
-import 'package:du/services/gridviw/useDataService.dart';
+import 'package:du/services/useDataService.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';

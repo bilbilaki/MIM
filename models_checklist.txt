@@ -1,0 +1,134 @@
+- [ ] aimodels
+  - [ ] ai_configs
+    - [ ] cred.dart
+    - [ ] providers_model.dart
+  - [ ] aitools
+    - [ ] audio_generation.dart
+    - [ ] edit.dart
+    - [ ] explain.dart
+    - [ ] image_generation.dart
+    - [ ] text_generation.dart
+    - [ ] transcript.dart
+    - [ ] translate.dart
+    - [ ] web_search.dart
+  - [ ] request_results
+    - [ ] audio_generation.dart
+    - [ ] explain_result.dart
+    - [ ] image_generation.dart
+    - [ ] text_generation_result.dart
+    - [ ] transcript_result.dart
+    - [ ] translate_result.dart
+    - [ ] web_search_result.dart
+  - [ ] requests
+    - [ ] audio_generation_requests.dart
+    - [ ] explain_request.dart
+    - [ ] image_generation_request.dart
+    - [ ] text_generation_requests.dart
+    - [ ] transcript_request.dart
+    - [ ] translate_request.dart
+    - [ ] web_search_requests.dart
+- [x] apkfile.dart
+- [x] archive.dart
+- [x] audio_item.dart
+- [x] certificate_file.dart
+- [x] csv_file.dart
+- [x] databasefile.dart
+- [x] deletedfile.dart
+- [x] document_item.dart
+- [x] draggable_object.dart
+- [x] entries.dart
+- [x] folder_item.dart
+- [x] image_item.dart
+- [x] imgisofile.dart
+- [x] json_file.dart
+- [x] linkedfile.dart
+- [x] markdown.dart
+- [x] movie_item.dart
+- [x] page_layout.dart
+- [x] python_file.dart
+- [ ] selfserver
+  - [ ] ftp_server.dart
+  - [ ] http_server.dart
+  - [ ] proxy_server.dart
+  - [ ] sftp_server.dart
+  - [ ] smb_server.dart
+- [ ] storages
+  - [ ] ftp_storage.dart
+  - [ ] http_storage.dart
+  - [ ] root_storage.dart
+  - [ ] s3_storage.dart
+  - [ ] sftp_storage.dart
+  - [ ] smb_storage.dart
+- [ ] task_manager.dart
+- [ ] tasks
+  - [ ] archive_file.dart
+  - [ ] batch_file_operation_archive.dart
+  - [ ] batch_file_operation_copy.dart
+  - [ ] batch_file_operation_extract.dart
+  - [ ] batch_file_operation_move.dart
+  - [ ] batch_file_operation_remove.dart
+  - [ ] batch_file_operation_rename.dart
+  - [ ] cache_folders.dart
+  - [ ] cache_media.dart
+  - [ ] change_access.dart
+  - [ ] change_owner.dart
+  - [ ] copy_file.dart
+  - [ ] copy_folder.dart
+  - [ ] create_file.dart
+  - [ ] create_folder.dart
+  - [ ] decrypt_file.dart
+  - [ ] deduplicate.dart
+  - [ ] duplicated_file.dart
+  - [ ] duplicated_folder.dart
+  - [ ] edit_file.dart
+  - [ ] edit_image.dart
+  - [ ] encrypt_file.dart
+  - [ ] extract_audio.dart
+  - [ ] extract_file.dart
+  - [ ] extract_thumbnail.dart
+  - [ ] extract_video.dart
+  - [ ] hash_check.dart
+  - [ ] index_files.dart
+  - [ ] install_file.dart
+  - [ ] link_preview.dart
+  - [ ] move_file.dart
+  - [ ] move_folder.dart
+  - [ ] remove_file.dart
+  - [ ] remove_folder.dart
+  - [ ] rename_file.dart
+  - [ ] rename_folder.dart
+  - [ ] search_content.dart
+  - [ ] search_file.dart
+  - [ ] sign_file.dart
+  - [ ] symlink_file.dart
+- [ ] tools
+  - [ ] action
+    - [ ] edit_hex_file.dart
+    - [ ] git_add_submodule.dart
+    - [ ] git_checkout.dart
+    - [ ] git_clone.dart
+    - [ ] git_commit.dart
+    - [ ] git_create_branch.dart
+    - [ ] git_discard_changes.dart
+    - [ ] git_patch.dart
+    - [ ] git_pull.dart
+    - [ ] git_push.dart
+    - [ ] git_remove_submodule.dart
+    - [ ] git_stage_changes.dart
+    - [ ] git_undo_last_commit.dart
+    - [ ] g_language_downloader.dart
+    - [ ] gml_downloader.dart
+    - [ ] list_file_download.dart
+    - [ ] rest_request_action.dart
+    - [ ] rest_request_action_result.dart
+    - [ ] single_file_download.dart
+  - [ ] download_manager.dart
+  - [ ] git_client.dart
+  - [ ] hex_editor.dart
+  - [ ] net_tools.dart
+  - [ ] offline_translator.dart
+  - [ ] rest_client.dart
+  - [ ] submodels
+    - [ ] download_item.dart
+  - [ ] x11_viewer.dart
+- [ ] unknown.dart

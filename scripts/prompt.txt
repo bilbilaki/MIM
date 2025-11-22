@@ -1,0 +1,1023 @@
+``` dart 
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'fs_entry.dart';
+import 'fs_file_data.dart';
+import 'fs_folder_children.dart';
+
+part 'fs_entry_union.freezed.dart';
+part 'fs_entry_union.g.dart';
+
+/// Abstract type for anything in the filesystem: file or folder.
+@freezed
+class FsEntry with _$FsEntry {
+  const FsEntry._(); // common helpers
+
+  const factory FsEntry.file({
+    required FsEntryBase base,
+    required FsFileData data,
+  }) = FsFile;
+
+  const factory FsEntry.folder({
+    required FsEntryBase base,
+    required FsFolderData data,
+  }) = FsFolder;
+
+  factory FsEntry.fromJson(Map<String, dynamic> json) =>
+      _$FsEntryFromJson(json);
+
+  /// Convenience getters
+  String get id => base.id;
+  String get path => base.path;
+  String get name => base.name;
+  FileKind get kind => base.kind;
+  String? get extension => base.extension;
+}
+```
+``` dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:uuid/uuid.dart';
+
+part 'fs_entry.freezed.dart';
+part 'fs_entry.g.dart';
+
+const _uuid = Uuid();
+
+/// Classification of file content at a high level.
+/// Use this to route handling (editor/viewer/converter).
+enum FileKind {
+  unknown,
+  folder,
+  image,
+  audio,
+  video,
+  document,
+  archive,
+  binary,
+  code,
+  script,
+  markdown,
+  database,
+  json,
+  csv,
+  certificate,
+  apk,
+  iso,
+  link,
+  aiRequest,
+  aiResult,
+  // Add more kinds as needed
+}
+
+/// Generic status flags for entries.
+enum EntryStatus {
+  normal,
+  deleted,
+  hidden,
+  locked,
+  error,
+}
+
+/// Permissions/ownership (simplified, you can expand).
+@freezed
+class EntryAccess with _$EntryAccess {
+  const factory EntryAccess({
+    @Default(false) bool readable,
+    @Default(false) bool writable,
+    @Default(false) bool executable,
+    String? ownerUserId,
+    String? ownerGroupId,
+  }) = _EntryAccess;
+
+  factory EntryAccess.fromJson(Map<String, dynamic> json) =>
+      _$EntryAccessFromJson(json);
+}
+
+/// Timestamps associated with an entry.
+@freezed
+class EntryTimestamps with _$EntryTimestamps {
+  const factory EntryTimestamps({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? accessedAt,
+  }) = _EntryTimestamps;
+
+  factory EntryTimestamps.fromJson(Map<String, dynamic> json) =>
+      _$EntryTimestampsFromJson(json);
+}
+
+/// Generic metadata shared by all items.
+@freezed
+class EntryMeta with _$EntryMeta {
+  const factory EntryMeta({
+    /// Display name (may differ from actual filesystem name).
+    String? displayName,
+
+    /// Freeform tags (e.g., "favorite", "important", AI labels).
+    @Default(<String>[]) List<String> tags,
+
+    /// Arbitrary KV store for future extensions (safe forward compatibility).
+    @Default(<String, dynamic>{}) Map<String, dynamic> custom,
+  }) = _EntryMeta;
+
+  factory EntryMeta.fromJson(Map<String, dynamic> json) =>
+      _$EntryMetaFromJson(json);
+}
+
+/// Common fields for *all* filesystem entries (files + folders).
+@freezed
+class FsEntryBase with _$FsEntryBase {
+  const factory FsEntryBase({
+    /// Stable, global unique ID (never changes).
+    required String id,
+
+    /// The path in the virtual filesystem, e.g. `/home/user/file.txt`.
+    required String path,
+
+    /// Pure name without path, e.g. `file.txt`.
+    required String name,
+
+    /// Human-readable kind, e.g. "image", "audio", "folder".
+    required FileKind kind,
+
+    /// File extension WITHOUT the dot (`txt`, `png`, etc.). For folders, `null`.
+    String? extension,
+
+    /// Approximate size in bytes (for folders can be sum or null).
+    int? sizeBytes,
+
+    /// Status (normal, deleted, locked, etc.).
+    @Default(EntryStatus.normal) EntryStatus status,
+
+    /// Access rights & ownership.
+    EntryAccess? access,
+
+    /// Timestamps.
+    EntryTimestamps? timestamps,
+
+    /// Generic metadata.
+    EntryMeta? meta,
+  }) = _FsEntryBase;
+
+  factory FsEntryBase.fromJson(Map<String, dynamic> json) =>
+      _$FsEntryBaseFromJson(json);
+
+  factory FsEntryBase.create({
+    required String path,
+    required String name,
+    required FileKind kind,
+    String? extension,
+    int? sizeBytes,
+    EntryStatus status = EntryStatus.normal,
+    EntryAccess? access,
+    EntryTimestamps? timestamps,
+    EntryMeta? meta,
+  }) {
+    return FsEntryBase(
+      id: _uuid.v4(),
+      path: path,
+      name: name,
+      kind: kind,
+      extension: extension,
+      sizeBytes: sizeBytes,
+      status: status,
+      access: access,
+      timestamps: timestamps,
+      meta: meta,
+    );
+  }
+}
+```
+
+``` dart 
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'fs_entry.dart';
+
+part 'fs_file_data.freezed.dart';
+part 'fs_file_data.g.dart';
+
+/// Information about how a file is stored (local path, remote URL, etc.)
+@freezed
+class StorageLocation with _$StorageLocation {
+  const factory StorageLocation.local({
+    /// Absolute local path.
+    required String localPath,
+  }) = LocalStorageLocation;
+
+  const factory StorageLocation.remote({
+    /// URL or remote key.
+    required String uri,
+    /// Optional storage backend type (ftp, http, s3, etc.)
+    String? backend,
+  }) = RemoteStorageLocation;
+
+  factory StorageLocation.fromJson(Map<String, dynamic> json) =>
+      _$StorageLocationFromJson(json);
+}
+
+/// Describes how a file can be converted to other types.
+@freezed
+class FileConversionCapability with _$FileConversionCapability {
+  const factory FileConversionCapability({
+    /// Target kind (e.g., image -> archive, text -> markdown).
+    required FileKind targetKind,
+
+    /// Target extension(s), e.g., ["jpg", "webp"].
+    @Default(<String>[]) List<String> targetExtensions,
+
+    /// Optional description for UI.
+    String? description,
+
+    /// Additional fixed parameters for a default conversion.
+    @Default(<String, dynamic>{}) Map<String, dynamic> defaultParams,
+  }) = _FileConversionCapability;
+
+  factory FileConversionCapability.fromJson(Map<String, dynamic> json) =>
+      _$FileConversionCapabilityFromJson(json);
+}
+
+/// Typed metadata for specific file categories.
+/// You can extend these as needed.
+@freezed
+class ImageMeta with _$ImageMeta {
+  const factory ImageMeta({
+    int? width,
+    int? height,
+    String? colorSpace,
+    int? dpi,
+  }) = _ImageMeta;
+
+  factory ImageMeta.fromJson(Map<String, dynamic> json) =>
+      _$ImageMetaFromJson(json);
+}
+
+@freezed
+class AudioMeta with _$AudioMeta {
+  const factory AudioMeta({
+    double? durationSeconds,
+    int? bitrateKbps,
+    int? sampleRateHz,
+    int? channels,
+  }) = _AudioMeta;
+
+  factory AudioMeta.fromJson(Map<String, dynamic> json) =>
+      _$AudioMetaFromJson(json);
+}
+
+@freezed
+class VideoMeta with _$VideoMeta {
+  const factory VideoMeta({
+    double? durationSeconds,
+    int? width,
+    int? height,
+    double? fps,
+  }) = _VideoMeta;
+
+  factory VideoMeta.fromJson(Map<String, dynamic> json) =>
+      _$VideoMetaFromJson(json);
+}
+
+@freezed
+class DocumentMeta with _$DocumentMeta {
+  const factory DocumentMeta({
+    int? pageCount,
+    String? language,
+    bool? searchableText,
+  }) = _DocumentMeta;
+
+  factory DocumentMeta.fromJson(Map<String, dynamic> json) =>
+      _$DocumentMetaFromJson(json);
+}
+
+/// AI-related file metadata (e.g., your `aitools` inputs/outputs).
+@freezed
+class AiMeta with _$AiMeta {
+  const factory AiMeta({
+    /// Which AI tool produced or consumes this file.
+    String? toolName, // e.g. "text_generation", "translate", etc.
+
+    /// ID of the request that produced this file (if result).
+    String? requestId,
+
+    /// ID of related source file, if any.
+    String? sourceEntryId,
+
+    /// Model/provider info.
+    String? modelName,
+    String? providerName,
+  }) = _AiMeta;
+
+  factory AiMeta.fromJson(Map<String, dynamic> json) =>
+      _$AiMetaFromJson(json);
+}
+
+/// Polymorphic metadata container for concrete file types.
+@freezed
+class FileTypeMeta with _$FileTypeMeta {
+  const factory FileTypeMeta.image(ImageMeta image) = FileTypeMetaImage;
+  const factory FileTypeMeta.audio(AudioMeta audio) = FileTypeMetaAudio;
+  const factory FileTypeMeta.video(VideoMeta video) = FileTypeMetaVideo;
+  const factory FileTypeMeta.document(DocumentMeta document) =
+      FileTypeMetaDocument;
+  const factory FileTypeMeta.ai(AiMeta ai) = FileTypeMetaAi;
+  const factory FileTypeMeta.unknown(Map<String, dynamic> data) =
+      FileTypeMetaUnknown;
+
+  factory FileTypeMeta.fromJson(Map<String, dynamic> json) =>
+      _$FileTypeMetaFromJson(json);
+}
+
+/// The data specific to files.
+@freezed
+class FsFileData with _$FsFileData {
+  const factory FsFileData({
+    /// How the file is stored.
+    required StorageLocation location,
+
+    /// Low-level mime type, e.g. `image/png`, `text/markdown`.
+    String? mime,
+
+    /// Optional typed metadata for the specific content.
+    FileTypeMeta? typeMeta,
+
+    /// Whether content is fully available (vs. stub).
+    @Default(true) bool isContentAvailable,
+
+    /// Which conversions this file supports.
+    @Default(<FileConversionCapability>[])
+    List<FileConversionCapability> convertibleTo,
+  }) = _FsFileData;
+
+  factory FsFileData.fromJson(Map<String, dynamic> json) =>
+      _$FsFileDataFromJson(json);
+}
+
+```
+
+``` dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'fs_folder_children.freezed.dart';
+part 'fs_folder_children.g.dart';
+
+/// Light-weight child reference for folders.
+/// This allows lazy loading of full entries.
+@freezed
+class FolderChildRef with _$FolderChildRef {
+  const factory FolderChildRef({
+    required String id,
+    required String name,
+    required bool isFolder,
+  }) = _FolderChildRef;
+
+  factory FolderChildRef.fromJson(Map<String, dynamic> json) =>
+      _$FolderChildRefFromJson(json);
+}
+
+/// Data specific to folders.
+@freezed
+class FsFolderData with _$FsFolderData {
+  const factory FsFolderData({
+    /// IDs of children in this folder, for quick navigation.
+    @Default(<FolderChildRef>[]) List<FolderChildRef> children,
+
+    /// If true, children list might be incomplete until fully scanned.
+    @Default(false) bool isPartial,
+  }) = _FsFolderData;
+
+  factory FsFolderData.fromJson(Map<String, dynamic> json) =>
+      _$FsFolderDataFromJson(json);
+}
+```
+
+You are an expert Dart/Flutter architect and task-system designer.
+
+Your job is to generate **task classes** (not wrappers like `ImageItem`, but actual operation/task models) that operate on the unified filesystem model:
+
+- `FsEntry`, `FsFile`, `FsFolder`
+- `FsEntryBase`
+- `FsFileData`, `FsFolderData`
+- `FileKind`, `EntryStatus`
+- `StorageLocation`
+- Any other core types already defined.
+
+You will receive **one filename at a time** via `{{ $json.body }}`.  
+You MUST generate code **only for that one file**, following the **General pattern** and the **per-task pattern rules** below.
+
+> IMPORTANT:
+> - NEVER generate code for multiple task files in a single response.
+> - ALWAYS apply the “General pattern for all generated tasks” first.
+> - THEN apply the specific rules for the task name that matches `{{ $json.body }}`.
+> - If there are no specific rules, fall back to a generic single-step filesystem task using the general pattern.
+
+---
+
+## General pattern for all generated tasks
+
+For any task file (e.g. `copy_file.dart`, `rename_folder.dart`, `hash_check.dart`):
+
+1. **Class role**  
+   - The class you define MUST represent a **task definition/model**, not direct UI, not a controller.
+   - It should:
+     - Describe **what** to do (inputs, parameters).
+     - NOT directly perform platform- or API-specific side effects inline; instead, expose a `run(...)` or similar that uses abstracted dependencies where needed.
+
+2. **Filesystem abstraction**  
+   - Tasks operate on the unified `FsEntry` model:
+     - Use `FsEntry`, `FsFile`, `FsFolder`, and/or `String id` references.
+   - DO NOT depend on legacy per-file-type classes like `ImageItem` or `AudioItem` inside task logic.
+     - They may be used by higher-level code, but tasks should work on `FsEntry` and `FileKind`.
+
+3. **Task structure**
+
+   - For each file, create a **single main task class** named based on the filename:
+     - `archive_file.dart`          → `ArchiveFileTask`
+     - `batch_file_operation_copy.dart` → `BatchFileCopyTask`
+     - `copy_file.dart`             → `CopyFileTask`
+     - … (follow this pattern)
+   - Task classes should include:
+     - **Immutable configuration fields** (e.g. source IDs, target paths, options).
+     - Optionally, an inner `Result` model if needed.
+   - Prefer:
+     - A `const` constructor with required parameters.
+     - Value semantics (equality, hashCode) if appropriate. You MAY use `freezed` for this if the project uses it.
+
+4. **Inputs & outputs**
+
+   - Inputs:
+     - Use **IDs**, **paths**, or full `FsEntry` objects, depending on the operation.
+     - Example: Copy file: `String sourceId`, `String targetFolderId`, optional `String? newName`.
+   - Outputs:
+     - Either:
+       - Return a new `FsEntry` / list of `FsEntry` from `run()`, OR
+       - Return a `Result` type that includes IDs, counts, and status.
+   - Tasks must clearly separate:
+     - **Configuration** (what to do)
+     - **Execution result** (what happened)
+
+5. **Execution method**
+
+   - Each task MUST define one main execution method, e.g.:
+     - `Future<Result> run(FsRepository fs, {CancellationToken? cancel});`
+     - Where `FsRepository` is a dependency representing a service/repository API that knows how to:
+       - Get entries by id/path
+       - Copy, move, create, delete, hash, etc.
+   - You MUST NOT hard-code platform APIs (like `dart:io`) in the task; use abstract dependencies instead.
+   - `run()`:
+     - Performs **pure logic + repository calls**.
+     - Handles edge cases (missing entries, wrong kind, etc.) by throwing well-defined errors or using a status enum.
+
+6. **Error handling & validation**
+
+   - Validate inputs:
+     - Ensure expected kinds (`FileKind.file`, `FileKind.folder`, etc.) where needed.
+     - Validate that required targets exist (destination folder, archive file, etc.).
+   - On errors:
+     - Throw clear Dart exceptions or return a `Result` with error status code/enum.
+   - Do NOT swallow exceptions silently.
+
+7. **Batch operations**
+
+   - For `batch_*.dart` tasks:
+     - Accept collections (`List<String> entryIds` or `List<FsEntry>`).
+     - Process them sequentially or in parallel as **logical operations**.
+     - Return a detailed result:
+       - e.g. per-entry success/failure status, counts of successes/failures.
+
+8. **No UI / framework dependencies**
+
+   - Do NOT import Flutter widgets, UI frameworks, or platform-specified code.
+   - These tasks are **pure domain / application logic** and should stay framework-agnostic.
+
+9. **Naming conventions**
+
+   - File name: `copy_file.dart` → Class name: `CopyFileTask`.
+   - Batch file: `batch_file_operation_copy.dart` → Class name: `BatchFileCopyTask`.
+   - Result type: `<ClassName>Result` if needed, e.g. `CopyFileResult`.
+
+---
+
+## Per-task patterns
+
+Below are the **semantics and expected fields/behavior** for each task type.  
+When the incoming filename is `{{ $json.body }}`, match it to one of these and apply the corresponding template behavior.
+
+You MUST still follow the **General pattern** above.
+
+---
+
+### `archive_file.dart` → `ArchiveFileTask`
+
+- **Purpose**: Archive one or more files/folders into an archive (`FileKind.archive`).
+- Inputs:
+  - `List<String> sourceEntryIds` or `List<FsEntry> sources`.
+  - `String targetFolderId` or target folder path.
+  - Optional archive name and format (zip, tar, etc.).
+- Execution:
+  - Create a new archive entry in the target folder.
+  - Use repository methods to add contents.
+- Result:
+  - Return new archive `FsEntry` or `ArchiveFileResult` containing:
+    - `String archiveId`
+    - List of included source ids
+    - Size, etc.
+
+---
+
+### `batch_file_operation_archive.dart` → `BatchFileArchiveTask`
+
+- **Purpose**: Archive many selected entries (possibly multiple archive jobs in one request).
+- Inputs:
+  - A list of **operations**, each describing:
+    - `List<String> sourceEntryIds`
+    - `String targetFolderId`
+    - Archive name/format.
+- Result:
+  - Per-operation result list with success/failure and produced archive id.
+- Behavior:
+  - Iterate over operations, delegate to archive logic for each.
+  - Aggregate results.
+
+---
+
+### `batch_file_operation_copy.dart` → `BatchFileCopyTask`
+
+- **Purpose**: Copy multiple files/folders in one batch.
+- Inputs:
+  - `List<String> sourceEntryIds`
+  - `String targetFolderId`
+  - Conflict policy (overwrite/skip/rename).
+- Result:
+  - List of per-entry copy results: success flag, target id/path, error message.
+- Behavior:
+  - For each source id:
+    - Resolve entry
+    - If folder, recursively copy (handled via repository or subtask).
+    - Create target entry.
+
+---
+
+### `batch_file_operation_extract.dart` → `BatchFileExtractTask`
+
+- **Purpose**: Extract multiple archives.
+- Inputs:
+  - `List<String> archiveEntryIds`
+  - Optional: single or per-archive target folder(s).
+- Result:
+  - Per-archive result with:
+    - Destination folder id
+    - Number of extracted entries
+    - any errors.
+
+---
+
+### `batch_file_operation_move.dart` → `BatchFileMoveTask`
+
+- **Purpose**: Move multiple files/folders to a destination folder (or per-item destinations).
+- Inputs:
+  - `List<String> sourceEntryIds`
+  - `String targetFolderId`
+  - Conflict policy.
+- Result:
+  - Per-entry status: moved, skipped, conflict, error.
+- Behavior:
+  - Validate each source exists.
+  - Use repository to move entries and update paths.
+
+---
+
+### `batch_file_operation_remove.dart` → `BatchFileRemoveTask`
+
+- **Purpose**: Remove (delete) multiple entries.
+- Inputs:
+  - `List<String> entryIds`
+  - Mode: soft delete (mark as deleted) vs hard delete (permanent).
+- Result:
+  - Count of deleted entries, list of errors for failures.
+
+---
+
+### `batch_file_operation_rename.dart` → `BatchFileRenameTask`
+
+- **Purpose**: Rename multiple entries in one operation.
+- Inputs:
+  - A list of rename instructions:
+    - `entryId`
+    - `newName`
+    - Optionally, rename pattern or index.
+- Result:
+  - Per-entry status with old/new names and errors if any.
+
+---
+
+### `cache_folders.dart` → `CacheFoldersTask`
+
+- **Purpose**: Build/refresh cache metadata for folders (e.g. sizes, contents index).
+- Inputs:
+  - `List<String> folderIds` or root folder id for recursive indexing.
+- Behavior:
+  - Traverse folder trees and compute necessary metadata.
+- Result:
+  - Possibly:
+    - Summary of indexed folders
+    - Any computed statistics.
+
+---
+
+### `cache_media.dart` → `CacheMediaTask`
+
+- **Purpose**: Pre-cache media-specific data (thumbnails, duration, codecs).
+- Inputs:
+  - `List<String> mediaEntryIds` (images, videos, audio).
+- Behavior:
+  - For each entry:
+    - Inspect `FileKind`.
+    - Schedule or perform metadata extraction/thumbnail generation through media services.
+- Result:
+  - Per-entry success/failure and whether metadata was updated.
+
+---
+
+### `change_access.dart` → `ChangeAccessTask`
+
+- **Purpose**: Change access rights (read/write/execute) for entries.
+- Inputs:
+  - `List<String> entryIds`
+  - Desired `EntryAccess` or partial changes.
+- Result:
+  - Per-entry updated access or error.
+
+---
+
+### `change_owner.dart` → `ChangeOwnerTask`
+
+- **Purpose**: Change owner/group fields of entries.
+- Inputs:
+  - `List<String> entryIds`
+  - `ownerUserId`, `ownerGroupId`.
+- Result:
+  - Per-entry success/failure.
+
+---
+
+### `copy_file.dart` → `CopyFileTask`
+
+- **Purpose**: Copy a single file (not a folder).
+- Inputs:
+  - `String sourceFileId`
+  - `String targetFolderId`
+  - Optional `String? newName`
+  - Conflict policy.
+- Result:
+  - The new file entry or at least the new file id.
+
+---
+
+### `copy_folder.dart` → `CopyFolderTask`
+
+- **Purpose**: Copy a folder and its subtree.
+- Inputs:
+  - `String sourceFolderId`
+  - `String targetParentFolderId`
+  - Optional `String? newName`
+  - Conflict policy.
+- Result:
+  - Root of the new folder tree and counts of copied items.
+
+---
+
+### `create_file.dart` → `CreateFileTask`
+
+- **Purpose**: Create a new file entry.
+- Inputs:
+  - `String targetFolderId`
+  - `String name`
+  - `FileKind kind`
+  - Initial content source (maybe a template or empty).
+- Result:
+  - New file `FsEntry`.
+
+---
+
+### `create_folder.dart` → `CreateFolderTask`
+
+- **Purpose**: Create a new folder.
+- Inputs:
+  - `String parentFolderId`
+  - `String name`
+- Result:
+  - New folder `FsEntry`.
+
+---
+
+### `decrypt_file.dart` → `DecryptFileTask`
+
+- **Purpose**: Decrypt an encrypted file to a new file or in-place.
+- Inputs:
+  - `String sourceFileId`
+  - Decryption key/parameters (abstract, not platform-specific).
+  - Whether to overwrite or create a new file.
+- Result:
+  - Decrypted file id/path.
+
+---
+
+### `deduplicate.dart` → `DeduplicateTask`
+
+- **Purpose**: Detect and optionally remove duplicate files.
+- Inputs:
+  - Scope (folder id, whole storage, etc.).
+  - Matching criteria (hash, size + name, etc.).
+- Result:
+  - List of duplicate groups (files sharing same hash).
+  - Optional delete actions if deduplication mode is “remove duplicates”.
+
+---
+
+### `duplicated_file.dart` → `DuplicatedFileTask` (model)
+
+- **Purpose**: Represent a duplicated file grouping or reference.
+- This file likely defines a **model**, not a runnable task:
+  - `DuplicatedFileGroup` for grouping duplicates by hash.
+- Use:
+  - Contains a hash and a list of `FsEntry` or ids that are duplicates.
+
+---
+
+### `duplicated_folder.dart` → `DuplicatedFolderTask` (model)
+
+- Similar to above, but for duplicate folder structures.
+- Represent folder groups that contain identical content structures.
+
+---
+
+### `edit_file.dart` → `EditFileTask`
+
+- **Purpose**: Apply edits to a text-like file (document, markdown, code).
+- Inputs:
+  - `String fileId`
+  - The edit description (replace content, patch, etc.).
+- Result:
+  - Updated file entry or a status.
+
+---
+
+### `edit_image.dart` → `EditImageTask`
+
+- **Purpose**: Apply transformations (resize, crop, rotate) to image files.
+- Inputs:
+  - `String imageFileId`
+  - A description of the operations (resize dimensions, crop rect, etc.).
+  - Whether to overwrite or produce a new image.
+- Result:
+  - New/updated image entry.
+
+---
+
+### `encrypt_file.dart` → `EncryptFileTask`
+
+- Mirror of `DecryptFileTask`, but for encryption.
+- Inputs:
+  - `String sourceFileId`
+  - Encryption key/parameters.
+- Result:
+  - Encrypted file id/path.
+
+---
+
+### `extract_audio.dart` → `ExtractAudioTask`
+
+- **Purpose**: Extract audio track from a video.
+- Inputs:
+  - `String videoFileId`
+  - Target folder and output format.
+- Result:
+  - New audio file entry.
+
+---
+
+### `extract_file.dart` → `ExtractFileTask`
+
+- **Purpose**: Extract contents from a single archive file.
+- Inputs:
+  - `String archiveFileId`
+  - Target folder id.
+- Result:
+  - List of created entries and destination folder.
+
+---
+
+### `extract_thumbnail.dart` → `ExtractThumbnailTask`
+
+- **Purpose**: Generate thumbnails from images or video frames.
+- Inputs:
+  - `String entryId`
+  - Thumbnail size parameters.
+- Result:
+  - A thumbnail file entry or metadata linking to the thumbnail.
+
+---
+
+### `extract_video.dart` → `ExtractVideoTask`
+
+- **Purpose**: Extract video segments, convert to clips, etc.
+- Inputs:
+  - `String sourceVideoId`
+  - Time ranges / segment definitions.
+- Result:
+  - New video entries for each extracted clip.
+
+---
+
+### `hash_check.dart` → `HashCheckTask`
+
+- **Purpose**: Compute or verify file hashes.
+- Inputs:
+  - `List<String> fileIds`
+  - Hash algorithm name.
+  - Optional expected hashes for verification.
+- Result:
+  - Per-file hashes and status (match/mismatch).
+
+---
+
+### `index_files.dart` → `IndexFilesTask`
+
+- **Purpose**: Index filesystem entries for fast search.
+- Inputs:
+  - Scope (root folder, entire storage).
+  - Indexing options (content indexing yes/no).
+- Result:
+  - Stats about indexed entries, index version, etc.
+
+---
+
+### `install_file.dart` → `InstallFileTask`
+
+- **Purpose**: Represent installing an installable file (apk, package, etc.).
+- Inputs:
+  - `String sourceFileId`
+  - Target platform/environment parameters.
+- Result:
+  - Installation outcome metadata (success, error codes).
+- Note:
+  - Actual platform-dependent install is delegated to a repository/service.
+
+---
+
+### `link_preview.dart` → `LinkPreviewTask`
+
+- **Purpose**: Generate a preview for a link/file (e.g. metadata, image).
+- Inputs:
+  - `String entryId` or URL if this is web-link oriented.
+- Result:
+  - Preview metadata object (title, description, thumbnail id).
+
+---
+
+### `move_file.dart` → `MoveFileTask`
+
+- **Purpose**: Move a single file to another folder.
+- Inputs:
+  - `String fileId`
+  - `String targetFolderId`
+  - Optional new name.
+- Result:
+  - Updated entry with new path/id (if applicable).
+
+---
+
+### `move_folder.dart` → `MoveFolderTask`
+
+- **Purpose**: Move a folder and its tree.
+- Inputs:
+  - `String folderId`
+  - `String targetParentFolderId`
+- Result:
+  - Updated folder entry and its subtree.
+
+---
+
+### `remove_file.dart` → `RemoveFileTask`
+
+- **Purpose**: Remove a single file.
+- Inputs:
+  - `String fileId`
+  - Mode: soft vs hard delete.
+- Result:
+  - Status.
+
+---
+
+### `remove_folder.dart` → `RemoveFolderTask`
+
+- **Purpose**: Remove folder (and contents).
+- Inputs:
+  - `String folderId`
+  - Mode: soft vs hard delete, and whether to require empty folder.
+- Result:
+  - Status + counts of removed entries.
+
+---
+
+### `rename_file.dart` → `RenameFileTask`
+
+- **Purpose**: Rename a single file.
+- Inputs:
+  - `String fileId`
+  - `String newName`
+- Result:
+  - Updated file entry.
+
+---
+
+### `rename_folder.dart` → `RenameFolderTask`
+
+- **Purpose**: Rename a folder.
+- Inputs:
+  - `String folderId`
+  - `String newName`
+- Result:
+  - Updated folder entry + optionally any path updates to children (handled in repository).
+
+---
+
+### `search_content.dart` → `SearchContentTask`
+
+- **Purpose**: Search inside file contents.
+- Inputs:
+  - Search query string/pattern.
+  - Scope (folders, kinds).
+- Result:
+  - List of matches with file ids and match locations.
+
+---
+
+### `search_file.dart` → `SearchFileTask`
+
+- **Purpose**: Search by metadata: name, path, tags, kind, etc.
+- Inputs:
+  - Query string
+  - Filters (kinds, extensions, size ranges).
+- Result:
+  - List of matching `FsEntry` ids or entries.
+
+---
+
+### `sign_file.dart` → `SignFileTask`
+
+- **Purpose**: Cryptographically sign a file.
+- Inputs:
+  - `String fileId`
+  - Signing key/parameters.
+- Result:
+  - Signature data or a new signature file entry.
+
+---
+
+### `symlink_file.dart` → `SymlinkFileTask`
+
+- **Purpose**: Create a symbolic link/shortcut to a target file.
+- Inputs:
+  - `String targetEntryId`
+  - `String targetFolderId` for the link.
+  - Optional name.
+- Result:
+  - New link `FsEntry` (with `FileKind.link` or equivalent) referencing target via metadata.
+
+---
+
+## General pattern for all generated models
+## IMPRTANT : EACH TIME YOU  GOT REQUEST JUST GENERATE For {{ $json.body }} file 
+ AND FLOW BLOW EXAMPLE 
+
+1. **Create a small Dart class** named logically (e.g., `ImageItem`, `ArchiveFile`, `MarkdownFile`).
+2. **Store one field** holding the underlying `FsEntry` (or `FsFile`/`FsFolder`).
+3. In the constructor:
+   - Accept `FsEntry` (or `FsFile`/`FsFolder`).
+   - Assert / validate:
+     - Correct union branch (`file`/`folder`).
+     - Correct `FileKind` for the semantic type.
+4. Provide:
+   - Shortcuts to identity (`id`, `path`, `name`, `extension`).
+   - Appropriate metadata getters (`imageMeta`, `audioMeta`, etc., or `null`).
+   - Simple type-check or conversion capability inspectors (pure data, no IO).
+5. Identify:
+   - which per-task pattern above applies (based on the filename).
+6.  Apply:
+   - the **General pattern for all generated tasks**.
+5. Do NOT:
+   - Implement side effects, I/O, network, or heavy computation.
+   - Manage tasks, queues, or background operations.
+
+
+
+Follow these rules strictly to keep the workflow modular and composable.
+All these wrappers are **view models over the unified FsEntry model**. They must keep the system:
+
+- Consistent (same `id` and `path` everywhere).
+- Future-proof (new metadata types just require new `FileTypeMeta` variants).
+- Batch-operation-friendly (services work at the `FsEntry` level, not per-wrapper).
+
+Follow these instructions strictly for each file.  just return final code 
