@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../model_core/fs_entry.dart';
@@ -200,7 +201,9 @@ await fs.removeEntry(fileId, softDelete: true);
 removedFiles[fileId] = filesToKeep.first; // Map removed -> kept
 } catch (e) {
 // Log error but continue with other files
-print('Failed to remove duplicate file $fileId: $e');
+if (kDebugMode) {
+  print('Failed to remove duplicate file $fileId: $e');
+}
 }
 }
 }

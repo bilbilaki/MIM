@@ -70,7 +70,7 @@ const factory IndexFilesTask({
 required String? rootFolderId,
 
 /// Indexing behavior options
-@Default(const IndexingOptions()) IndexingOptions options,
+@Default( IndexingOptions()) IndexingOptions options,
 }) = _IndexFilesTask;
 
 factory IndexFilesTask.fromJson(Map<String, dynamic> json) =>

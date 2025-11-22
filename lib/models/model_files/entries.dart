@@ -38,11 +38,11 @@ class Entries {
 
   /// Gets all entries that are files.
   List<FsEntry> get files =>
-      _entries.values.where((entry) => entry is FsFile).toList();
+      _entries.values.whereType<FsFile>().toList();
 
   /// Gets all entries that are folders.
   List<FsEntry> get folders =>
-      _entries.values.where((entry) => entry is FsFolder).toList();
+      _entries.values.whereType<FsFolder>().toList();
 
   /// Gets the number of entries in this collection.
   int get length => _entries.length;

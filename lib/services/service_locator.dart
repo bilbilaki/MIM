@@ -1,4 +1,6 @@
+import 'package:du/services/useDataService.dart';
 import 'package:provider/provider.dart';
+import '../providers/local_explorer_provider.dart';
 import '../repositories/local_fs_repository.dart';
 
 /// Service locator setup for dependency injection.
@@ -14,28 +16,19 @@ class ServiceLocator {
 
   ServiceLocator._internal();
 
-  /// Get a list of providers to be used with MultiProvider at the app root
-  static List<ChangeNotifierProvider> getProviders() {
-    return [
-      // Add your application providers here
-      // Example: ChangeNotifierProvider(create: (_) => YourProvider()),
-    ];
-  }
-
-  /// Get a list of single-value providers for repositories and services
-  static List<Provider> getSingleProviders() {
-    return [
-      // Provide the LocalFsRepository as a singleton
-      Provider<LocalFsRepository>(
-        create: (_) => LocalFsRepository(),
-      ),
-    ];
-  }
-
   /// Combines all providers into a single list for MultiProvider
   static List<ChangeNotifierProvider<dynamic>> getAllProviders() {
+    return [...getProviders()];
+  }
+
+  static List<ChangeNotifierProvider> getProviders() {
     return [
-      ...getProviders(),
+      ChangeNotifierProvider(create: (_) => LocalProvider()),
+      ChangeNotifierProvider(create: (_) => UserDataService()),
     ];
+  }
+
+  static List<Provider> getSingleProviders() {
+    return [Provider<LocalFsRepository>(create: (_) => LocalFsRepository())];
   }
 }
