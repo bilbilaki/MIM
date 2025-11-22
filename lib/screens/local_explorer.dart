@@ -139,6 +139,8 @@ class LocalScreenState extends State<LocalScreen> {
   }
 
   /// Combines all file and folder lists from the provider and sorts them.
+  /// Legacy version using File/Directory (deprecated - use _getSortedItemsFromDomainModel instead)
+  @Deprecated('Use _getSortedItemsFromDomainModel instead')
   List<GridItem> _getSortedItems(LocalProvider provider) {
     final items = [
       ...provider.folders.map((f) => GridItem(f)),
@@ -156,8 +158,8 @@ class LocalScreenState extends State<LocalScreen> {
           break;
         case SortMode.date:
           // For date, newer comes first if descending, older comes first if ascending
-          comparison = b.entity.statSync().modified.compareTo(
-            a.entity.statSync().modified,
+          comparison = b.entity!.statSync().modified.compareTo(
+            a.entity!.statSync().modified,
           );
           break;
         case SortMode.type:
@@ -169,10 +171,54 @@ class LocalScreenState extends State<LocalScreen> {
           } else {
             String typeA = a.isFolder
                 ? 'folder'
-                : p.extension(a.entity.path).toLowerCase();
+                : p.extension(a.entity!.path).toLowerCase();
             String typeB = b.isFolder
                 ? 'folder'
-                : p.extension(b.entity.path).toLowerCase();
+                : p.extension(b.entity!.path).toLowerCase();
+            comparison = typeA.compareTo(typeB);
+            if (comparison == 0) {
+              comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            }
+          }
+          break;
+      }
+      return _sortAscending ? comparison : -comparison;
+    });
+
+    return items;
+  }
+
+  /// Combines all file and folder lists from the provider and sorts them.
+  /// This version uses the new domain model entries (FsEntry) when available
+  /// 
+  /// Currently not used in UI, but ready for gradual migration to domain model.
+  /// Will replace _getSortedItems() in future refactoring phases.
+  // ignore: unused_element
+  List<GridItem> _getSortedItemsFromDomainModel(LocalProvider provider) {
+    final items = provider.entries
+        .map((entry) => GridItem.fromFsEntry(entry))
+        .toList();
+
+    items.sort((a, b) {
+      int comparison;
+      switch (_sortMode) {
+        case SortMode.name:
+          comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          break;
+        case SortMode.date:
+          // For date, newer comes first if descending, older comes first if ascending
+          // Note: FsEntry has timestamps, would need to extract here
+          comparison = 0; // TODO: Implement date sorting for FsEntry
+          break;
+        case SortMode.type:
+          // Sort folders first, then files by type, then by name
+          if (a.isFolder && !b.isFolder) {
+            comparison = -1;
+          } else if (!a.isFolder && b.isFolder) {
+            comparison = 1;
+          } else {
+            String typeA = a.isFolder ? 'folder' : p.extension(a.path).toLowerCase();
+            String typeB = b.isFolder ? 'folder' : p.extension(b.path).toLowerCase();
             comparison = typeA.compareTo(typeB);
             if (comparison == 0) {
               comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());

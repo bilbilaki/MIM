@@ -9,6 +9,9 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pool/pool.dart'; // FIX: Import the pool package
+import '../models/model_core/fs_entry.dart';
+import '../models/model_core/fs_entry_union.dart';
+import '../repositories/local_fs_repository.dart';
 
 /// A provider for managing and interacting with a user-selected external directory.
 /// - Stores path with SharedPreferences
@@ -21,6 +24,12 @@ class LocalProvider extends ChangeNotifier {
   static const _kExternalPathKey = 'external_directory_path';
   static const _kThumbnailCacheMapKey =
       'thumbnail_cache_map'; // New key for thumbnail paths map
+
+  // Domain model layer - new repository for FsEntry conversion
+  final LocalFsRepository _fsRepository = LocalFsRepository();
+  
+  // Cached FsEntry list for the current directory
+  List<FsEntry> _currentEntries = [];
 
   String? _basePath;
   bool isSmb=false;
@@ -39,6 +48,34 @@ class LocalProvider extends ChangeNotifier {
   List<File> get documents =>
       List.unmodifiable(_documents); // Getter for documents
   List<File> get images => List.unmodifiable(_images); // Getter for images
+
+  // New domain model getters - replaces typed lists with filtered FsEntry
+  /// All entries in the current directory (files and folders)
+  List<FsEntry> get entries => List.unmodifiable(_currentEntries);
+
+  /// Only folder entries
+  List<FsEntry> get folderEntries =>
+      _currentEntries.where((e) => e.isFolder).toList();
+
+  /// Only file entries (all types)
+  List<FsEntry> get fileEntries =>
+      _currentEntries.where((e) => e.isFile).toList();
+
+  /// Only image file entries
+  List<FsEntry> get imageEntries =>
+      _currentEntries.where((e) => e.kind == FileKind.image).toList();
+
+  /// Only video file entries
+  List<FsEntry> get videoEntries =>
+      _currentEntries.where((e) => e.kind == FileKind.video).toList();
+
+  /// Only audio file entries
+  List<FsEntry> get audioEntries =>
+      _currentEntries.where((e) => e.kind == FileKind.audio).toList();
+
+  /// Only document file entries
+  List<FsEntry> get documentEntries =>
+      _currentEntries.where((e) => e.kind == FileKind.document).toList();
 
   /// The directory being currently listed (for subfolder navigation)
   String? get currentPath => _currentPath ?? _basePath;
@@ -369,6 +406,7 @@ class LocalProvider extends ChangeNotifier {
     _audios = [];
     _documents = [];
     _images = [];
+    _currentEntries = [];
     notifyListeners();
   }
 
@@ -379,6 +417,7 @@ class LocalProvider extends ChangeNotifier {
     _audios = [];
     _images = [];
     _documents = []; // Clear previous lists
+    _currentEntries = []; // Clear domain model entries
 
     // Determine the path to load: if not provided, use root (_basePath)
     String? dirPath = folder ?? _basePath;
@@ -386,9 +425,14 @@ class LocalProvider extends ChangeNotifier {
 
     _currentPath = dirPath;
 
-    final dir = Directory(dirPath);
-    if (await dir.exists()) {
-      try {
+    try {
+      // Use repository to get FsEntry objects (new domain model)
+      _currentEntries = await _fsRepository.listContents(dirPath);
+
+      // Maintain backward compatibility by populating legacy typed lists
+      // from the FsEntry objects
+      final dir = Directory(dirPath);
+      if (await dir.exists()) {
         final entries = dir.listSync();
         _folders = entries.whereType<Directory>().toList();
 
@@ -405,9 +449,9 @@ class LocalProvider extends ChangeNotifier {
             _documents.add(file); // Include general text/document files
           }
         }
-      } catch (e) {
-        if (kDebugMode) print("Error listing directory $dirPath: $e");
       }
+    } catch (e) {
+      if (kDebugMode) print("Error listing directory $dirPath: $e");
     }
   }
 

@@ -4,34 +4,37 @@ import '../model_core/fs_entry_union.dart';
 import '../model_core/fs_file_data.dart';
 /// Typed wrapper for image files providing convenient, type-safe accessors.
 class ImageItem {
-      final FsFile _file;
+  final FsFile _file;
+
+  /// Private constructor - use factory methods instead.
+  const ImageItem._(this._file);
 
   /// Creates an [ImageItem] from an [FsEntry].
   ///
   /// Validates that the entry is a file with [FileKind.image].
   /// Throws [ArgumentError] if validation fails.
-  ImageItem(FsEntry entry)
-      : _file = (() {
-              if (entry is! FsFile) {
-                throw ArgumentError('ImageItem can only wrap file entries');
-          }
-          if (entry.base.kind != FileKind.image) {
-                throw ArgumentError('ImageItem requires FileKind.image, got ${entry.base.kind}');
-          }
-          return entry;
-        })();
+  factory ImageItem(FsEntry entry) {
+    if (entry is! FsFile) {
+      throw ArgumentError('ImageItem can only wrap file entries');
+    }
+    if (entry.base.kind != FileKind.image) {
+      throw ArgumentError(
+          'ImageItem requires FileKind.image, got ${entry.base.kind}');
+    }
+    return ImageItem._(entry);
+  }
 
   /// Creates an [ImageItem] directly from an [FsFile].
   ///
   /// Validates that the file has [FileKind.image].
   /// Throws [ArgumentError] if validation fails.
-  ImageItem.fromFile(FsFile file)
-      : _file = (() {
-              if (file.base.kind != FileKind.image) {
-                throw ArgumentError('ImageItem requires FileKind.image, got ${file.base.kind}');
-          }
-          return file;
-        })();
+  factory ImageItem.fromFile(FsFile file) {
+    if (file.base.kind != FileKind.image) {
+      throw ArgumentError(
+          'ImageItem requires FileKind.image, got ${file.base.kind}');
+    }
+    return ImageItem._(file);
+  }
 
   /// The underlying file entry.
   FsFile get file => _file;
