@@ -1,3 +1,4 @@
+import 'package:du/models/model_core/fs_entry.dart';
 import 'package:du/models/model_core/fs_entry_union.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -103,80 +104,93 @@ class ZipExplorerView extends StatelessWidget {
   }
 
   Widget _buildEntryTile(BuildContext context, FsEntry entry) {
+    final kind = entry.kind;
     IconData icon;
-    String title;
-    String? subtitle;
-    
-    if (entry is FolderItem) {
+    String subtitle;
+
+    if (entry.isFolder) {
       icon = Icons.folder;
-      title = entry.name;
       subtitle = 'Folder';
-    } else if (entry is DocumentItem) {
-      icon = Icons.description;
-      title = entry.name;
-      subtitle = entry.formattedSize;
-    } else if (entry is ImageItem) {
-      icon = Icons.image;
-      title = entry.name;
-      subtitle = entry.formattedSize;
-    } else if (entry is MovieItem) {
-      icon = Icons.movie;
-      title = entry.name;
-      subtitle = entry.formattedSize;
-    } else if (entry is AudioItem) {
-      icon = Icons.audiotrack;
-      title = entry.name;
-      subtitle = entry.formattedSize;
     } else {
-      icon = Icons.insert_drive_file;
-      title = 'Unknown';
-      subtitle = null;
+      switch (kind) {
+        case FileKind.image:
+          icon = Icons.image;
+          break;
+        case FileKind.video:
+          icon = Icons.movie;
+          break;
+        case FileKind.audio:
+          icon = Icons.audiotrack;
+          break;
+        case FileKind.document:
+        case FileKind.markdown:
+        case FileKind.json:
+        case FileKind.csv:
+          icon = Icons.description;
+          break;
+        default:
+          icon = Icons.insert_drive_file;
+      }
+      final size = entry.sizeBytes;
+      subtitle = size != null ? _formatSize(size) : kind.toString().split('.').last;
     }
 
     return ListTile(
       leading: Icon(icon, size: 40),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle) : null,
-      onTap: () => _handleEntryTap(context, entry),
-      onLongPress: () => _showEntryContextMenu(context, entry),
+      title: Text(entry.name),
+      subtitle: Text(subtitle),
+      onTap: () => handleEntryTap(context, entry),
+      onLongPress: () => showEntryContextMenu(context, entry),
     );
   }
 
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
   Widget _buildEntryCard(BuildContext context, FsEntry entry) {
+    final kind = entry.kind;
     IconData icon;
-    String title;
     Color color;
-    
-    if (entry is FolderItem) {
+
+    if (entry.isFolder) {
       icon = Icons.folder;
-      title = entry.name;
       color = Colors.amber;
-    } else if (entry is DocumentItem) {
-      icon = Icons.description;
-      title = entry.name;
-      color = Colors.blue;
-    } else if (entry is ImageItem) {
-      icon = Icons.image;
-      title = entry.name;
-      color = Colors.green;
-    } else if (entry is MovieItem) {
-      icon = Icons.movie;
-      title = entry.name;
-      color = Colors.purple;
-    } else if (entry is AudioItem) {
-      icon = Icons.audiotrack;
-      title = entry.name;
-      color = Colors.orange;
     } else {
-      icon = Icons.insert_drive_file;
-      title = 'Unknown';
-      color = Colors.grey;
+      switch (kind) {
+        case FileKind.image:
+          icon = Icons.image;
+          color = Colors.green;
+          break;
+        case FileKind.video:
+          icon = Icons.movie;
+          color = Colors.purple;
+          break;
+        case FileKind.audio:
+          icon = Icons.audiotrack;
+          color = Colors.orange;
+          break;
+        case FileKind.document:
+        case FileKind.markdown:
+        case FileKind.json:
+        case FileKind.csv:
+          icon = Icons.description;
+          color = Colors.blue;
+          break;
+        default:
+          icon = Icons.insert_drive_file;
+          color = Colors.grey;
+      }
     }
 
     return Card(
       child: InkWell(
-        onTap: () => _handleEntryTap(context, entry),
-        onLongPress: () => _showEntryContextMenu(context, entry),
+        onTap: () => handleEntryTap(context, entry),
+        onLongPress: () => showEntryContextMenu(context, entry),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -185,7 +199,7 @@ class ZipExplorerView extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
-                title,
+                entry.name,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -197,13 +211,13 @@ class ZipExplorerView extends StatelessWidget {
       ),
     );
   }
-
-  void _handleEntryTap(BuildContext context, FsEntry entry) {
-    if (entry is FolderItem) {
-      // Navigate into the folder
+  void handleEntryTap(BuildContext context, FsEntry entry) {
+    if (entry.isFolder) {
       zipProvider.navigateIntoZipFolder(entry.path);
-    } else if (entry is DocumentItem) {
-      // Edit the document
+    } else if (entry.kind == FileKind.document ||
+        entry.kind == FileKind.markdown ||
+        entry.kind == FileKind.json ||
+        entry.kind == FileKind.csv) {
       LocalScreenFileOperations.editFileInZip(
         context,
         entry.path,
@@ -214,10 +228,9 @@ class ZipExplorerView extends StatelessWidget {
       showSnackBar('Preview not available for this file type');
     }
   }
-
-  void _showEntryContextMenu(BuildContext context, Entries entry) {
-    final isDirectory = entry is FolderItem;
-    final entryPath = _getEntryPath(entry);
+  void showEntryContextMenu(BuildContext context, FsEntry entry) {
+    final isDirectory = entry.isFolder;
+    final entryPath = entry.path;
     
     LocalScreenContextMenus.showZipEntryContextMenu(
       context,
@@ -225,28 +238,23 @@ class ZipExplorerView extends StatelessWidget {
       isDirectory,
       (path) => _handleExtractEntry(context, path),
       (path) => _handleDeleteEntry(context, path),
-      (path) => LocalScreenFileOperations.renameInZip(context, path, zipProvider, showSnackBar),
+      (path) => LocalScreenFileOperations.renameInZip(
+        context,
+        path,
+        zipProvider,
+        showSnackBar,
+      ),
       !isDirectory
-          ? (path) => LocalScreenFileOperations.editFileInZip(context, path, zipProvider, showSnackBar)
+          ? (path) => LocalScreenFileOperations.editFileInZip(
+                context,
+                path,
+                zipProvider,
+                showSnackBar,
+              )
           : null,
     );
   }
-
-  String _getEntryPath(FsEntry entry) {
-    if (entry is FolderItem) {
-      return entry.path;
-    } else if (entry is DocumentItem) {
-      return entry.path;
-    } else if (entry is ImageItem) {
-      return entry.path;
-    } else if (entry is MovieItem) {
-      return entry.path;
-    } else if (entry is AudioItem) {
-      return entry.path;
-    }
-    return '';
-  }
-
+  String _getEntryPath(FsEntry entry) => entry.path;
   void _handleBackPress(BuildContext context) {
     zipProvider.navigateUpInZip();
   }

@@ -224,4 +224,72 @@ static void showFileContextMenuForEntry(
       },
     );
   }
+
+  /// Displays a bottom sheet context menu for ZIP entries
+  static void showZipEntryContextMenu(
+    BuildContext context,
+    String entryPath,
+    bool isDirectory,
+    Function(String) onExtract,
+    Function(String) onDelete,
+    Function(String) onRename,
+    Function(String)? onEdit,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                title: Text(
+                  p.basename(entryPath),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  isDirectory ? 'Folder' : 'File',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.unarchive),
+                title: const Text('Extract'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onExtract(entryPath);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Rename'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onRename(entryPath);
+                },
+              ),
+              if (!isDirectory && onEdit != null)
+                ListTile(
+                  leading: const Icon(Icons.document_scanner),
+                  title: const Text('Edit Content'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onEdit(entryPath);
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onDelete(entryPath);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

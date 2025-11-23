@@ -1,4 +1,5 @@
 import 'package:du/providers/local_explorer_provider.dart';
+import 'package:du/providers/zip_explorer_provider.dart';
 import 'package:du/screens/local_explorer.dart';
 import 'package:du/services/service_locator.dart';
 import 'package:du/services/useDataService.dart';
@@ -18,6 +19,9 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(
           create: (context) => LocalProvider()
+        ),
+                ChangeNotifierProvider(
+          create: (context) => ZipExplorerProvider()
         ),
                 ChangeNotifierProvider(
           create: (context) => UserDataService(),

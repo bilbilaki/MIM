@@ -61,6 +61,7 @@ dependencies:
   path: ^1.9.1
   native_zip: ^0.8.4
   flutter_code_editor: ^0.3.5
+  file_magic_number: ^1.4.1
 
 dev_dependencies:
   flutter_test:

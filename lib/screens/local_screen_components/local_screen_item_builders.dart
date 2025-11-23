@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:file_magic_number/file_magic_number.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -179,6 +180,14 @@ static Widget _buildThumbnailOrIconFromEntry(
       defaultIcon = Icons.description;
       iconColor = Colors.grey.shade600;
       break;
+       case FileKind.archive:
+      defaultIcon = Icons.archive;
+      iconColor = const Color.fromARGB(255, 233, 145, 63);
+      break;
+            case FileKind.unknown:
+      defaultIcon = Icons.device_unknown_outlined;
+      iconColor = const Color.fromARGB(255, 167, 212, 62);
+      break;
     default:
       defaultIcon = Icons.insert_drive_file;
       iconColor = Colors.grey;
@@ -283,6 +292,56 @@ static Widget _buildThumbnailOrIconFromEntry(
     );
   }
 
+  /// Map of FileMagicNumberType to FileKind for type detection
+  static final Map<FileMagicNumberType, FileKind> magicNumberToFileKind = {
+    // Archives
+    FileMagicNumberType.zip: FileKind.archive,
+    FileMagicNumberType.rar: FileKind.archive,
+    FileMagicNumberType.sevenZ: FileKind.archive,
+    FileMagicNumberType.tar: FileKind.archive,
+    // Images
+    FileMagicNumberType.png: FileKind.image,
+    FileMagicNumberType.jpg: FileKind.image,
+    FileMagicNumberType.gif: FileKind.image,
+    FileMagicNumberType.bmp: FileKind.image,
+    FileMagicNumberType.tiff: FileKind.image,
+    FileMagicNumberType.heic: FileKind.image,
+    FileMagicNumberType.webp: FileKind.image,
+    // Videos
+    FileMagicNumberType.mp4: FileKind.video,
+    FileMagicNumberType.avi: FileKind.video,
+    // Audio
+    FileMagicNumberType.mp3: FileKind.audio,
+    FileMagicNumberType.wav: FileKind.audio,
+    // Documents
+    FileMagicNumberType.pdf: FileKind.document,
+    FileMagicNumberType.sqlite: FileKind.document,
+  };
+
+  /// Detects FileKind from file magic number as a fallback for unknown files
+  static Future<FileKind> detectFileKindFromMagicNumber(String filePath) async {
+    try {
+      final FileMagicNumberType fileType =
+          await FileMagicNumber.detectFileTypeFromPathOrBlob(filePath);
+      
+      // Try to find the file kind from the magic number map
+      final detectedKind = magicNumberToFileKind[fileType];
+      if (detectedKind != null) {
+        if (kDebugMode) {
+          print('Detected file kind from magic number: $detectedKind for $fileType');
+        }
+        return detectedKind;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error detecting file type from magic number: $e');
+      }
+    }
+    
+    // Fallback to unknown if detection fails
+    return FileKind.unknown;
+  }
+
   /// Determines if a thumbnail should be generated or a default icon should be displayed
   static Widget buildThumbnailOrIcon(File file, LocalProvider provider) {
     IconData defaultIcon;
@@ -300,17 +359,19 @@ static Widget _buildThumbnailOrIconFromEntry(
     } else if (provider.isTextFile(file)) {
       defaultIcon = Icons.description;
       iconColor = Colors.grey.shade600;
+    } else if (provider.isUnknownFile(file)) {
+      // For unknown files, use FutureBuilder to detect type via magic number
+      return _buildUnknownFileThumbnailWithDetection(file, provider);
     } else {
       defaultIcon = Icons.insert_drive_file;
       iconColor = Colors.grey;
     }
 
-    bool canGetThumbnail =
-        provider.isMovieFile(file) ||
+    bool canGetThumbnail = provider.isMovieFile(file) ||
         provider.isImageFile(file) ||
         provider.isAudioFile(file) ||
         provider.isTextFile(file);
-        
+
     if (!canGetThumbnail) {
       return Container(
         color: Colors.grey[100],
@@ -344,6 +405,113 @@ static Widget _buildThumbnailOrIconFromEntry(
         return Container(
           color: Colors.grey[100],
           child: Center(child: Icon(defaultIcon, color: iconColor, size: 48)),
+        );
+      },
+    );
+  }
+
+  /// Builds thumbnail or icon for unknown files by detecting via magic number
+  static Widget _buildUnknownFileThumbnailWithDetection(
+      File file, LocalProvider provider) {
+    return FutureBuilder<FileKind>(
+      future: detectFileKindFromMagicNumber(file.path),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            color: Colors.grey[100],
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2.0),
+            ),
+          );
+        }
+
+        final detectedKind = snapshot.data ?? FileKind.unknown;
+
+        // Get icon and color based on detected kind
+        IconData icon;
+        Color color;
+
+        switch (detectedKind) {
+          case FileKind.archive:
+            icon = Icons.archive;
+            color = const Color.fromARGB(255, 233, 145, 63);
+            break;
+          case FileKind.image:
+            icon = Icons.image;
+            color = Colors.blue.shade400;
+            break;
+          case FileKind.video:
+            icon = Icons.movie;
+            color = Colors.red.shade400;
+            break;
+          case FileKind.audio:
+            icon = Icons.audio_file;
+            color = Colors.green.shade400;
+            break;
+          case FileKind.document:
+          case FileKind.markdown:
+          case FileKind.json:
+          case FileKind.csv:
+            icon = Icons.description;
+            color = Colors.grey.shade600;
+            break;
+          case FileKind.unknown:
+          default:
+            icon = Icons.device_unknown_outlined;
+            color = const Color.fromARGB(255, 167, 212, 62);
+        }
+
+        // Try to get thumbnail if the detected kind supports it
+        final supportsThumbnail = {
+          FileKind.image,
+          FileKind.video,
+          FileKind.audio,
+          FileKind.document,
+          FileKind.markdown,
+          FileKind.json,
+          FileKind.csv,
+        }.contains(detectedKind);
+
+        if (supportsThumbnail) {
+          return FutureBuilder<Uint8List?>(
+            future: provider.getThumbnail(file.path),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2.0),
+                );
+              }
+              if (snapshot.hasData && snapshot.data != null) {
+                return Image.memory(
+                  snapshot.data!,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[100],
+                      child: Center(
+                        child: Icon(icon, color: color, size: 48),
+                      ),
+                    );
+                  },
+                );
+              }
+              return Container(
+                color: Colors.grey[100],
+                child: Center(
+                  child: Icon(icon, color: color, size: 48),
+                ),
+              );
+            },
+          );
+        }
+
+        // No thumbnail support, just show icon
+        return Container(
+          color: Colors.grey[100],
+          child: Center(
+            child: Icon(icon, color: color, size: 48),
+          ),
         );
       },
     );

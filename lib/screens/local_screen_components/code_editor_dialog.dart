@@ -10,6 +10,8 @@ class CodeEditorDialog extends StatefulWidget {
   final String filePath;
   final String initialContent;
   final Function(String) onSave;
+    final Function(String) onSaveAs;
+
   final bool readOnly;
 
   const CodeEditorDialog({
@@ -17,6 +19,8 @@ class CodeEditorDialog extends StatefulWidget {
     required this.filePath,
     required this.initialContent,
     required this.onSave,
+        required this.onSaveAs,
+
     this.readOnly = false,
   });
 
@@ -125,8 +129,14 @@ class _CodeEditorDialogState extends State<CodeEditorDialog> {
     super.dispose();
   }
 
-  void _handleSave() {
-    widget.onSave(_codeController.text);
+  void _handleSave() async {
+  await  widget.onSave(_codeController.text);
+    setState(() {
+      _hasChanges = false;
+    });
+  }
+  void _handleSaveAs() async {
+   await  widget.onSaveAs(_codeController.text);
     setState(() {
       _hasChanges = false;
     });
@@ -255,6 +265,15 @@ class _CodeEditorDialogState extends State<CodeEditorDialog> {
                       icon: const Icon(Icons.save),
                       label: const Text('Save'),
                       onPressed: _hasChanges ? _handleSave : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                                        ElevatedButton.icon(
+                      icon: const Icon(Icons.save_as),
+                      label: const Text('Save As'),
+                      onPressed: _hasChanges ? _handleSaveAs : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,

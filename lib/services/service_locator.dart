@@ -1,3 +1,4 @@
+import 'package:du/providers/zip_explorer_provider.dart';
 import 'package:du/services/useDataService.dart';
 import 'package:provider/provider.dart';
 import '../providers/local_explorer_provider.dart';
@@ -25,6 +26,8 @@ class ServiceLocator {
     return [
       ChangeNotifierProvider(create: (_) => LocalProvider()),
       ChangeNotifierProvider(create: (_) => UserDataService()),
+            ChangeNotifierProvider(create: (_) => ZipExplorerProvider()),
+
     ];
   }
 

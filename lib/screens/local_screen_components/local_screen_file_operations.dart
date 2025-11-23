@@ -92,29 +92,8 @@ class LocalScreenFileOperations {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Edit: ${p.basename(documentFile.path)}'),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: TextField(
-              controller: contentController,
-              maxLines: null,
-              expands: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Document content',
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final String newContent = contentController.text;
+        return  CodeEditorDialog(
+         filePath: documentFile.path, initialContent: initialContent, onSave: (String newContent)async { 
                 final bool success = await provider.saveDocumentContent(
                   documentFile.path,
                   newContent,
@@ -124,13 +103,10 @@ class LocalScreenFileOperations {
                   Navigator.of(context).pop();
                 } else {
                   showSnackBar('Failed to save file.');
-                }
-              },
-              child: const Text('Save'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final String? newFileName = await LocalScreenDialogs.showInputDialog(
+                } 
+                
+                },
+         onSaveAs: (String newContent)async  {                final String? newFileName = await LocalScreenDialogs.showInputDialog(
                   context,
                   'Save As',
                   'Enter new file name (e.g., my_document.txt):',
@@ -143,7 +119,7 @@ class LocalScreenFileOperations {
                   );
                   final bool success = await provider.saveDocumentContentAs(
                     newFilePath,
-                    contentController.text,
+                    newContent,
                   );
                   if (success) {
                     showSnackBar('File saved as $newFileName successfully.');
@@ -152,11 +128,7 @@ class LocalScreenFileOperations {
                     showSnackBar('Failed to save file as $newFileName.');
                   }
                 }
-              },
-              child: const Text('Save As'),
-            ),
-          ],
-        );
+         });
       },
     );
   }
@@ -508,6 +480,8 @@ class LocalScreenFileOperations {
     ZipExplorerProvider zipProvider,
     Function(String) showSnackBar,
   ) async {
+              LocalProvider provider = LocalProvider();
+
     showSnackBar('Loading file from ZIP...');
     
     final content = await zipProvider.readFileFromZip(filePath);
@@ -525,13 +499,33 @@ class LocalScreenFileOperations {
         onSave: (newContent) async {
           showSnackBar('Saving file to ZIP...');
           final success = await zipProvider.writeFileToZip(filePath, newContent);
-          
           if (success) {
             showSnackBar('File saved to ZIP successfully');
           } else {
             showSnackBar('Failed to save file to ZIP');
           }
-        },
+        }, onSaveAs: (String newContent )async {     final String? newFileName = await LocalScreenDialogs.showInputDialog(
+                  context,
+                  'Save As',
+                  'Enter new file name (e.g., my_document.txt):',
+                  p.basename(filePath),
+                );
+                if (newFileName != null && newFileName.isNotEmpty) {
+                  final String newFilePath = p.join(
+                    p.dirname(filePath),
+                    newFileName,
+                  );
+                  final bool success = await provider.saveDocumentContentAs(
+                    newFilePath,
+                    newContent,
+                  );
+                  if (success) {
+                    showSnackBar('File saved as $newFileName successfully.');
+                    Navigator.of(context).pop();
+                  } else {
+                    showSnackBar('Failed to save file as $newFileName.');
+                  }
+                } },
       ),
     );
   }

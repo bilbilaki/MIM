@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/model_core/fs_entry.dart';
 import '../models/model_core/fs_entry_union.dart';
 import '../providers/local_explorer_provider.dart';
+import '../providers/zip_explorer_provider.dart';
 import 'local_screen_components/local_screen_models.dart';
 import 'local_screen_components/local_screen_drawers.dart';
 import 'local_screen_components/local_screen_dialogs.dart';
@@ -16,7 +17,7 @@ import 'local_screen_components/local_screen_file_operations.dart';
 import 'local_screen_components/local_screen_appbar_actions.dart';
 import 'local_screen_components/local_screen_path_header.dart';
 import 'local_screen_components/local_screen_tree_sidebar.dart';
-import '../../models/model_core/fs_entry_union.dart';
+import 'local_screen_components/zip_explorer_view.dart';
 
 // Main tap handler from FsEntry
 
@@ -31,7 +32,7 @@ class LocalScreenState extends State<LocalScreen> {
   // `currentFolderPath` keeps track of the subfolder the user is currently viewing.
   // If null, it means the user is at the root of the `externalPath`.
   String? currentFolderPath;
-
+ZipExplorerProvider _zipper = ZipExplorerProvider();
   // State for new features
   ViewMode _viewMode = ViewMode.grid;
   SortMode _sortMode = SortMode.type;
@@ -139,60 +140,6 @@ class LocalScreenState extends State<LocalScreen> {
       // Otherwise, open the parent folder
       _openFolder(parentDir.path);
     }
-  }
-
-  /// Combines all file and folder lists from the provider and sorts them.
-  /// Legacy version using File/Directory (deprecated - use _getSortedItemsFromDomainModel instead)
-  @Deprecated('Use _getSortedItemsFromDomainModel instead')
-  List<GridItem> _getSortedItems(LocalProvider provider) {
-    final items = [
-      ...provider.folders.map((f) => GridItem(f)),
-      ...provider.movies.map((f) => GridItem(f)),
-      ...provider.audios.map((f) => GridItem(f)),
-      ...provider.images.map((f) => GridItem(f)),
-      ...provider.documents.map((f) => GridItem(f)),
-    ];
-
-    items.sort((a, b) {
-      int comparison;
-      switch (_sortMode) {
-        case SortMode.name:
-          comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-          break;
-        case SortMode.date:
-  final aTime = a.fsEntry?.base.timestamps?.updatedAt ??
-                a.fsEntry?.base.timestamps?.createdAt ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-  final bTime = b.fsEntry?.base.timestamps?.updatedAt ??
-                b.fsEntry?.base.timestamps?.createdAt ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-  // Newer first when descending
-  comparison = bTime.compareTo(aTime);
-  break;
-        case SortMode.type:
-          // Sort folders first, then files by type, then by name
-          if (a.isFolder && !b.isFolder) {
-            comparison = -1;
-          } else if (!a.isFolder && b.isFolder) {
-            comparison = 1;
-          } else {
-            String typeA = a.isFolder
-                ? 'folder'
-                : p.extension(a.entity!.path).toLowerCase();
-            String typeB = b.isFolder
-                ? 'folder'
-                : p.extension(b.entity!.path).toLowerCase();
-            comparison = typeA.compareTo(typeB);
-            if (comparison == 0) {
-              comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-            }
-          }
-          break;
-      }
-      return _sortAscending ? comparison : -comparison;
-    });
-
-    return items;
   }
 
   /// Combines all file and folder lists from the provider and sorts them.
@@ -366,6 +313,7 @@ final sortedItems = _getSortedItemsFromDomainModel(provider);
   Widget _buildGridView(List<GridItem> items) {
     double aspectRatio = _gridCrossAxisCount <= 3 ? 0.8 : 1.0;
 
+
     return GridView.builder(
       padding: const EdgeInsets.all(16.0),
       itemCount: items.length,
@@ -389,7 +337,16 @@ if (entry != null) {
       () => _openFolder(entry.path),
       () => _showFolderContextMenu(Directory(entry.path)),
     );
-  } else {
+  } else if (entry.kind == FileKind.archive) {
+    return LocalScreenItemBuilders.buildFileTileFromEntry(
+      entry,
+      provider,
+      () => _zipper.enterZipMode(entry.path),
+      () => _showArchiveContextMenu(entry),
+    );
+  } 
+  
+  else {
     return LocalScreenItemBuilders.buildFileTileFromEntry(
       entry,
       provider,
@@ -552,7 +509,113 @@ void _showFileContextMenuFromEntry(FsEntry entry) {
     );
   }
 
- 
+  void _showArchiveContextMenu(FsEntry entry) {
+    final provider = Provider.of<LocalProvider>(context, listen: false);
+    
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                title: Text(
+                  entry.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('Archive File'),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.unarchive),
+                title: const Text('Extract All'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _handleExtractArchive(entry);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.explore),
+                title: const Text('Browse'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _zipper.enterZipMode(entry.path);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => Scaffold(
+                        appBar: AppBar(
+                          title: Text(entry.name),
+                          leading: IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              _zipper.exitZipMode();
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ),
+                        body: ZipExplorerView(
+                          zipProvider: _zipper,
+                          localProvider: provider,
+                          showSnackBar: showSnackBar,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Rename'),
+                onTap: () {
+                  Navigator.pop(context);
+                  LocalScreenFileOperations.renameEntry(
+                    context,
+                    entry,
+                    provider,
+                    showSnackBar,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(context);
+                  LocalScreenFileOperations.deleteEntry(
+                    context,
+                    entry,
+                    provider,
+                    showSnackBar,
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleExtractArchive(FsEntry archiveEntry) async {
+    final destinationPath = await FilePicker.platform.getDirectoryPath();
+    if (destinationPath == null) {
+      showSnackBar('No destination folder selected');
+      return;
+    }
+
+    try {
+      // Use the zip service to extract all files from the archive
+      await _zipper.extractFromZip(
+        sourcePaths: [], // Empty list means extract all
+        destinationPath: destinationPath,
+        onProgress: (progress) => showSnackBar('Extracting...'),
+      );
+      showSnackBar('Archive extracted successfully to $destinationPath');
+    } catch (e) {
+      showSnackBar('Error extracting archive: $e');
+    }
+  }
 
   /// Load image files from a directory
  

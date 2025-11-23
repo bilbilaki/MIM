@@ -6,6 +6,10 @@ import 'package:path/path.dart' as p;
 import 'package:native_zip/native_zip.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/model_core/fs_entry.dart';
+import '../models/model_core/fs_entry_union.dart';
+import '../models/model_core/fs_file_data.dart';
+import '../models/model_core/fs_folder_children.dart';
 import '../providers/local_explorer_provider.dart';
 
 
@@ -55,56 +59,170 @@ class ZipService {
     showProgress(future);
    cancel?future.cancel(): await future;
   }
-
-  Future<void> openAndListZip(
+  /// Read text content of a file inside the zip.
+  Future<String?> readTextFileInZip(
     String inputZipFilePath,
-    String? whichPath,
-    Future<String?> content, {
-    bool close = false,
-    bool read = false,
-    bool write = false,
-    bool cancel=false
-  }) async {
-    ZipFile zip = NativeZip.openZipFile(inputZipFilePath);
-    var entries;
-    if (close) return zip.close();
-    
-    if (!read && !write) {
-      // List directory entries
-      if (whichPath == null) {
-        entries = zip.getEntries();
-      } else {
-        entries = zip.getEntries(path: whichPath, recursive: false);
-      }
-      
-     // _provider.clearSelection();
-      
-      for (final entry in entries) {
-       // _provider(entry);
-      }
-    } else if (read) {
-      content = zip.openRead(whichPath!).transform(utf8.decoder).join();
-    } else if (write) {
-      String icontent = await content ?? '';
-      String targetFileName = p.basename(whichPath!);
-      final tmpDir = await getTemporaryDirectory();
-      final tfile = p.join(tmpDir.path, targetFileName);
-      late File ttfile= File(tfile);
-      if(cancel) return await addFilesToZip(inputZipFilePath, [ttfile.path], whichPath,cancel: cancel);
-      tcreatedfile() async {
-        int i = 0;
-        while (i < 2) {
-          ttfile = await File(tfile).exists()
-              ? await File(tfile).writeAsString(icontent)
-              : await File(tfile).create();
-          i ++;
-        }
-      }
-
-      await tcreatedfile();
-      await addFilesToZip(inputZipFilePath, [ttfile.path], whichPath);
+    String entryPath,
+  ) async {
+    final zip = NativeZip.openZipFile(inputZipFilePath);
+    try {
+      return await zip.openRead(entryPath).transform(utf8.decoder).join();
+    } catch (e) {
+      log('Error reading from zip: $e');
+      return null;
+    } finally {
+      // zip.close(); // if safe
     }
-    
+  }
+
+  /// Write/replace a file entry inside the zip with given text content.
+  Future<void> writeTextFileInZip(
+    String inputZipFilePath,
+    String entryPath,
+    String content,
+  ) async {
+    final tmpDir = await getTemporaryDirectory();
+    final targetFileName = p.basename(entryPath);
+    final tempFilePath = p.join(tmpDir.path, targetFileName);
+    final tempFile = File(tempFilePath);
+    await tempFile.writeAsString(content);
+
+    await addFilesToZip(
+      inputZipFilePath,
+      [tempFile.path],
+      p.dirname(entryPath),
+    );
+  }
+  /// List entries inside a zip at a given virtual path.
+  /// If [whichPath] is null or empty, list the root.
+  Future<List<ZipEntryInfo>> listZipEntries(
+    String inputZipFilePath, {
+    String? whichPath,
+  }) async {
+    final zip = NativeZip.openZipFile(inputZipFilePath);
+    try {
+      if (whichPath == null || whichPath.isEmpty) {
+        return zip.getEntries();
+      } else {
+        // Only direct children of whichPath
+        return zip.getEntries(path: whichPath, recursive: false);
+      }
+    } finally {
+      // We leave the zip open for other operations; you can close it if needed.
+      // zip.close();
+    }
+  }
+
+  /// Convert raw ZipEntryInfo list into FsEntry list using your domain model.
+  List<FsEntry> zipEntriesToFsEntries(List<ZipEntryInfo> entries) {
+    final result = <FsEntry>[];
+
+    for (final entry in entries) {
+      final fsEntry = zipEntryToFsEntry(entry);
+      if (fsEntry != null) {
+        result.add(fsEntry);
+      }
+    }
+    return result;
+  }
+
+  /// Convert a single ZipEntryInfo to FsEntry.file or FsEntry.folder.
+  FsEntry? zipEntryToFsEntry(ZipEntryInfo zipEntry) {
+    final pathInZip = zipEntry.path;
+
+    // Skip root pseudo-entry if library uses it
+    if (pathInZip.isEmpty || pathInZip == '/') {
+      return null;
+    }
+
+    final name = p.basename(
+      zipEntry.isDirectory && pathInZip.endsWith('/')
+          ? pathInZip.substring(0, pathInZip.length - 1)
+          : pathInZip,
+    );
+
+    if (zipEntry.isDirectory) {
+      return FsEntry.folder(
+        base: FsEntryBase.create(
+          path: pathInZip,
+          name: name,
+          kind: FileKind.folder,
+          // We treat zip path as "virtual", so no size.
+          sizeBytes: null,
+          timestamps: EntryTimestamps(
+            createdAt: zipEntry.modifiedDateTime,
+            updatedAt: zipEntry.modifiedDateTime,
+          ),
+        ),
+        data: const FsFolderData(
+          children: [],
+          isPartial: true,
+        ),
+      );
+    } else {
+      final ext = p.extension(pathInZip).toLowerCase();
+      final kind = _kindFromExtension(ext);
+
+      return FsEntry.file(
+        base: FsEntryBase.create(
+          path: pathInZip,
+          name: name,
+          kind: kind,
+          extension: ext.isNotEmpty ? ext.substring(1) : null,
+          sizeBytes: zipEntry.originalSize,
+          timestamps: EntryTimestamps(
+            createdAt: zipEntry.modifiedDateTime,
+            updatedAt: zipEntry.modifiedDateTime,
+          ),
+        ),
+        data: FsFileData(
+          // We encode "location in zip" in a RemoteStorageLocation for now
+          location: StorageLocation.remote(
+            uri: pathInZip,
+            backend: 'zip',
+          ),
+          mime: null,
+          typeMeta: null,
+          isContentAvailable: false,
+          convertibleTo: const [],
+        ),
+      );
+    }
+  }
+
+  /// Map zip file extensions to FileKind; reuse your LocalFsRepository logic if desired.
+  FileKind _kindFromExtension(String ext) {
+    final lower = ext.toLowerCase();
+    if (lower.isEmpty) return FileKind.unknown;
+
+    const videoExts = {
+      '.mp4', '.avi', '.mkv', '.mov', '.webm', '.flv', '.wmv', '.m4v', '.ts', '.mts',
+    };
+    const audioExts = {
+      '.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.wma', '.aiff', '.alac',
+    };
+    const imageExts = {
+      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg', '.tiff', '.raw',
+    };
+    const archiveExts = {
+      '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso',
+    };
+    const documentExts = {
+      '.txt', '.md', '.pdf', '.docx', '.xlsx', '.pptx', '.odt', '.rtf', '.html',
+      '.htm', '.xml', '.yaml', '.yml', '.log',
+    };
+
+    if (imageExts.contains(lower)) return FileKind.image;
+    if (videoExts.contains(lower)) return FileKind.video;
+    if (audioExts.contains(lower)) return FileKind.audio;
+    if (archiveExts.contains(lower)) return FileKind.archive;
+    if (lower == '.apk') return FileKind.apk;
+    if (lower == '.json') return FileKind.json;
+    if (lower == '.csv') return FileKind.csv;
+    if (lower == '.md') return FileKind.markdown;
+    if (documentExts.contains(lower)) return FileKind.document;
+
+    return FileKind.unknown;
   }
   
     Future<void> renameEntryInZip(

@@ -4,18 +4,16 @@ import 'package:du/models/model_core/fs_entry_union.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../services/zip_service.dart';
-import 'local_explorer_provider.dart';
 
 /// Provider for managing zip file exploration and operations
 class ZipExplorerProvider extends ChangeNotifier {
   final ZipService _zipService = ZipService();
-  final LocalProvider _localProvider = LocalProvider();
-  
-  String? _currentZipPath;
+    String? _currentZipPath;
   String? _currentPathInZip;
   List<FsEntry> _zipEntries = [];
   bool _isInZipMode = false;
   Map<String, double> _operationProgress = {};
+
   
   String? get currentZipPath => _currentZipPath;
   String? get currentPathInZip => _currentPathInZip;
@@ -88,55 +86,30 @@ class ZipExplorerProvider extends ChangeNotifier {
   Future<void> _loadZipContents() async {
     if (_currentZipPath == null) return;
     
-    _zipEntries = [];
-    _localProvider.clearSelection();
-    
-    await _zipService.openAndListZip(
-      _currentZipPath!,
-      _currentPathInZip,
-      Future.value(null),
-    );
-    
-    // The zip service updates the local provider's lists
-    // Copy those entries to our local list
-    _zipEntries = [
-      ..._localProvider.folders,
-      ..._localProvider.movies,
-      ..._localProvider.audios,
-      ..._localProvider.images,
-      ..._localProvider.documents,
-    ];
-  }
-  
-  /// Read content of a file from zip
+    try {
+      final rawEntries = await _zipService.listZipEntries(
+        _currentZipPath!,
+        whichPath: _currentPathInZip,
+      );
+      _zipEntries = _zipService.zipEntriesToFsEntries(rawEntries);
+    } catch (e) {
+      if (kDebugMode) print('Error loading zip contents: $e');
+      _zipEntries = [];
+    }
+  }  /// Read content of a file from zip
   Future<String?> readFileFromZip(String filePath) async {
     if (_currentZipPath == null) return null;
-    
-    try {
-      final completer = Completer<String?>();
-      await _zipService.openAndListZip(
-        _currentZipPath!,
-        filePath,
-        completer.future,
-        read: true,
-      );
-      return await completer.future;
-    } catch (e) {
-      if (kDebugMode) print('Error reading file from zip: $e');
-      return null;
-    }
-  }
-  
+    return _zipService.readTextFileInZip(_currentZipPath!, filePath);
+  }  
   /// Write/update content of a file in zip
   Future<bool> writeFileToZip(String filePath, String content) async {
     if (_currentZipPath == null) return false;
     
     try {
-      await _zipService.openAndListZip(
+      await _zipService.writeTextFileInZip(
         _currentZipPath!,
         filePath,
-        Future.value(content),
-        write: true,
+        content,
       );
       await _loadZipContents();
       return true;
@@ -144,8 +117,7 @@ class ZipExplorerProvider extends ChangeNotifier {
       if (kDebugMode) print('Error writing file to zip: $e');
       return false;
     }
-  }
-  
+  }  
   /// Extract files from zip to a directory
   Future<bool> extractFromZip({
     required List<String> sourcePaths,
