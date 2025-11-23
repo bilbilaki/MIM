@@ -34,21 +34,29 @@ class LocalProvider extends ChangeNotifier {
   String? _basePath;
   bool isSmb=false;
   String? _currentPath; // Track the path currently listing
+    @deprecated
   List<Directory> _folders = [];
+  @deprecated
   List<File> _movies = [];
+  @deprecated
   List<File> _audios = [];
-  List<File> _documents = []; // New list for documents/text files
-  List<File> _images = []; // New list for image files
+  @deprecated
+  List<File> _documents = [];
+  @deprecated
+  List<File> _images = [];
 
+  @deprecated
+  List<Directory> get folders => List.unmodifiable(_folders);
+  @deprecated
+  List<File> get movies => List.unmodifiable(_movies);
+  @deprecated
+  List<File> get audios => List.unmodifiable(_audios);
+  @deprecated
+  List<File> get documents => List.unmodifiable(_documents);
+  @deprecated
+  List<File> get images => List.unmodifiable(_images);
   String? get externalPath => _basePath;
   bool? get _isSmb => isSmb; 
-  List<Directory> get folders => List.unmodifiable(_folders);
-  List<File> get movies => List.unmodifiable(_movies);
-  List<File> get audios => List.unmodifiable(_audios);
-  List<File> get documents =>
-      List.unmodifiable(_documents); // Getter for documents
-  List<File> get images => List.unmodifiable(_images); // Getter for images
-
   // New domain model getters - replaces typed lists with filtered FsEntry
   /// All entries in the current directory (files and folders)
   List<FsEntry> get entries => List.unmodifiable(_currentEntries);

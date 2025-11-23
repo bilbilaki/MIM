@@ -4,6 +4,8 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../models/model_core/fs_entry.dart';
+import '../models/model_core/fs_entry_union.dart';
 import '../providers/local_explorer_provider.dart';
 import 'local_screen_components/local_screen_models.dart';
 import 'local_screen_components/local_screen_drawers.dart';
@@ -14,6 +16,9 @@ import 'local_screen_components/local_screen_file_operations.dart';
 import 'local_screen_components/local_screen_appbar_actions.dart';
 import 'local_screen_components/local_screen_path_header.dart';
 import 'local_screen_components/local_screen_tree_sidebar.dart';
+import '../../models/model_core/fs_entry_union.dart';
+
+// Main tap handler from FsEntry
 
 class LocalScreen extends StatefulWidget {
   const LocalScreen({super.key});
@@ -71,8 +76,6 @@ class LocalScreenState extends State<LocalScreen> {
       showSnackBar('No folder selected. Please select a folder to start.');
     }
   }
-
-  // --- NAVIGATION LOGIC ---
 
   /// Navigates into a specific folder and refreshes the displayed content.
   void _openFolder(String folderPath) {
@@ -157,11 +160,15 @@ class LocalScreenState extends State<LocalScreen> {
           comparison = a.name.toLowerCase().compareTo(b.name.toLowerCase());
           break;
         case SortMode.date:
-          // For date, newer comes first if descending, older comes first if ascending
-          comparison = b.entity!.statSync().modified.compareTo(
-            a.entity!.statSync().modified,
-          );
-          break;
+  final aTime = a.fsEntry?.base.timestamps?.updatedAt ??
+                a.fsEntry?.base.timestamps?.createdAt ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+  final bTime = b.fsEntry?.base.timestamps?.updatedAt ??
+                b.fsEntry?.base.timestamps?.createdAt ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+  // Newer first when descending
+  comparison = bTime.compareTo(aTime);
+  break;
         case SortMode.type:
           // Sort folders first, then files by type, then by name
           if (a.isFolder && !b.isFolder) {
@@ -241,7 +248,7 @@ class LocalScreenState extends State<LocalScreen> {
           return _buildEmptyView();
         }
 
-        final sortedItems = _getSortedItems(provider);
+final sortedItems = _getSortedItemsFromDomainModel(provider);
         // Display the current folder name in the AppBar, or "Local Files" if at root
         final currentDirName = currentFolderPath != null
             ? p.basename(currentFolderPath!)
@@ -371,27 +378,98 @@ class LocalScreenState extends State<LocalScreen> {
       itemBuilder: (context, idx) {
         final item = items[idx];
         final provider = Provider.of<LocalProvider>(context, listen: false);
-        return item.isFolder
-            ? LocalScreenItemBuilders.buildFolderTile(
-                item.entity as Directory,
-                () => _openFolder((item.entity as Directory).path),
-                () => _showFolderContextMenu(item.entity as Directory),
-              )
-            : LocalScreenItemBuilders.buildFileTile(
-                item.entity as File,
-                provider,
-                () => LocalScreenFileOperations.handleFileTap(
-                  context,
-                  item.entity as File,
-                  provider,
-                  showSnackBar,
-                ),
-                () => _showFileContextMenu(item.entity as File),
-              );
+        
+       final entry = item.entry; // may be null for legacy items
+
+if (entry != null) {
+  // Domain-model based rendering
+  if (entry.isFolder) {
+    return LocalScreenItemBuilders.buildFolderTileFromEntry(
+      entry,
+      () => _openFolder(entry.path),
+      () => _showFolderContextMenu(Directory(entry.path)),
+    );
+  } else {
+    return LocalScreenItemBuilders.buildFileTileFromEntry(
+      entry,
+      provider,
+      () => LocalScreenFileOperations.handleEntryTap(
+        context,
+        entry,
+        provider,
+        showSnackBar,
+      ),
+      () => _showFileContextMenuFromEntry(entry),
+    );
+  }
+} else {
+  // Fallback to legacy rendering (optional, can be removed when no legacy)
+  final entity = item.entity!;
+  return entity is Directory
+      ? LocalScreenItemBuilders.buildFolderTile(
+          entity,
+          () => _openFolder(entity.path),
+          () => _showFolderContextMenu(entity),
+        )
+      : LocalScreenItemBuilders.buildFileTile(
+          entity as File,
+          provider,
+          () => LocalScreenFileOperations.handleFileTap(
+            context,
+            entity,
+            provider,
+            showSnackBar,
+          ),
+          () => _showFileContextMenu(entity),
+        );
+}
+        
       },
     );
   }
-
+void _showFileContextMenuFromEntry(FsEntry entry) {
+  final provider = Provider.of<LocalProvider>(context, listen: false);
+  LocalScreenContextMenus.showFileContextMenuForEntry(
+    context,
+    entry,
+    provider,
+    (e) => LocalScreenFileOperations.renameEntry(
+      context,
+      e,
+      provider,
+      showSnackBar,
+    ),
+    (e) => LocalScreenFileOperations.copyEntry(
+      context,
+      e,
+      provider,
+      currentFolderPath,
+      showSnackBar,
+    ),
+    (e) => LocalScreenFileOperations.moveEntry(
+      context,
+      e,
+      provider,
+      currentFolderPath,
+      showSnackBar,
+    ),
+    (e) => LocalScreenFileOperations.deleteEntry(
+      context,
+      e,
+      provider,
+      showSnackBar,
+    ),
+    // Edit content only if document
+    entry.kind == FileKind.document || entry.kind == FileKind.markdown
+        ? (e) => LocalScreenFileOperations.showEntryDocumentDialog(
+              context,
+              e,
+              provider,
+              showSnackBar,
+            )
+        : null,
+  );
+}
   // --- List View Builder ---
   Widget _buildListView(List<GridItem> items) {
     return ListView.builder(
